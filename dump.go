@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 
 	. "github.com/fuzzy/gocolor"
 	"github.com/kisielk/whisper-go/whisper"

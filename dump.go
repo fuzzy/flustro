@@ -35,8 +35,8 @@ type Metadata struct {
 }
 
 func DumpWhisperFile(c *cli.Context) error {
-	data := Metadata{}
 	for _, f := range c.Args() {
+		data := Metadata{}
 		db, err := whisper.Open(f)
 		if err != nil {
 			fmt.Println("Could not open whisper file:", err)
@@ -73,15 +73,25 @@ func DumpWhisperFile(c *cli.Context) error {
 				}
 			}
 		}
-	}
-	DumpStruct(data, true)
-	fmt.Println("")
-	for i, v := range data.Archives {
-		if i == 0 {
-			DumpStruct(v, true)
-		} else {
-			DumpStruct(v, false)
+		DumpStruct(data, true)
+		fmt.Println("")
+		for i, v := range data.Archives {
+			if i == 0 || c.Bool("P") {
+				DumpStruct(v, true)
+			} else {
+				DumpStruct(v, false)
+			}
+			if c.Bool("P") {
+				for n, p := range v.Points {
+					if n == 0 {
+						DumpStruct(p, true)
+					} else {
+						DumpStruct(p, false)
+					}
+				}
+			}
 		}
+		fmt.Printf("\n\n")
 	}
 	return nil
 }

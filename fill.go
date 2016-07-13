@@ -57,6 +57,24 @@ func backfillFile(s string, d string) bool {
 				if a.SecondsPerPoint == dstDb.Header.Archives[i].SecondsPerPoint {
 					// ok, now let's get rolling through the archives
 					fmt.Println("WE ARE GO, I REPEAT, WE ARE FUCKING GO!")
+					sp, se := srcDb.DumpArchive(i)
+					if se != nil {
+						fmt.Printf("%s: %s\n", String("ERROR").Red().Bold(), se)
+						os.Exit(1)
+					}
+					dp, de := dstDb.DumpArchive(i)
+					if de != nil {
+						fmt.Printf("%s: %s\n", String("ERROR").Red().Bold(), de)
+						os.Exit(1)
+					}
+					for idx := 0; idx < len(sp); idx++ {
+						if sp[idx].Timestamp != 0 && sp[idx].Value != 0 {
+							if dp[idx].Timestamp == 0 || dp[idx].Value == 0 {
+								fmt.Printf("SRC: %s %d %f\n", sp[idx].Time(), sp[idx].Timestamp, sp[idx].Value)
+								fmt.Printf("DST: %s %d %f\n", dp[idx].Time(), dp[idx].Timestamp, dp[idx].Value)
+							}
+						}
+					}
 				}
 			}
 		}

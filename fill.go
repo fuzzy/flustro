@@ -32,9 +32,10 @@ func chkErr(e error) bool {
 func backfillFile(s string, d string) bool {
 	// Open our filehandles
 	srcDb, srcErr := whisper.Open(s)
-	chkErr(srcErr)
 	dstDb, dstErr := whisper.Open(d)
-	chkErr(dstErr)
+	if !chkErr(srcErr) || !chkErr(dstErr) {
+		os.Exit(1)
+	}
 	// Defer their closings
 	defer srcDb.Close()
 	defer dstDb.Close()

@@ -1,13 +1,11 @@
-// utils.go
 package main
 
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
-
-	. "github.com/fuzzy/gocolor"
 )
 
 func isDir(p string) bool {
@@ -18,9 +16,17 @@ func isDir(p string) bool {
 	return f.IsDir()
 }
 
+func isFile(p string) bool {
+	if _, err := os.Stat(p); err == nil && !isDir(p) {
+		return true
+	} else {
+		return false
+	}
+}
+
 func chkErr(e error) bool {
 	if e != nil {
-		fmt.Printf("%s: %s\n", String("ERROR").Red().Bold(), e)
+		Error(e.Error())
 		return false
 	} else {
 		return true
@@ -70,5 +76,19 @@ func buffer(m int, h int) string {
 	for i := h; i < m; i++ {
 		retv = fmt.Sprintf("%s ", retv)
 	}
+	return retv
+}
+
+func listFiles(p string) (retv []string) {
+	cwd, _ := os.Getwd()
+	os.Chdir(p)
+	filepath.Walk(".", func(p string, i os.FileInfo, e error) error {
+		chkErr(e)
+		if !i.IsDir() {
+			retv = append(retv, p)
+		}
+		return nil
+	})
+	os.Chdir(cwd)
 	return retv
 }

@@ -112,8 +112,7 @@ func DumpWhisperFile(c *cli.Context) error {
 				})
 				p, e := db.DumpArchive(i)
 				if e != nil {
-					fmt.Printf("%s: Failed to read archive: %s\n",
-						String("ERROR").Red().Bold(), e)
+					Error(e.Error())
 					return e
 				}
 				for _, point := range p {

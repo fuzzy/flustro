@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"path"
+	"reflect"
 	"time"
 
 	. "github.com/fuzzy/gocolor"
@@ -34,6 +35,56 @@ type Metadata struct {
 	Archives     []Archive
 }
 
+func dumpStruct(s interface{}, h bool) {
+	typ := reflect.TypeOf(s)
+	switch typ.Kind() {
+	case reflect.Struct:
+		// First, lets find our longest element
+		le, te := longestElement(s)
+		// Now let's print our header
+		if h {
+			for i := 0; i < typ.NumField(); i++ {
+				p := typ.Field(i)
+				if !p.Anonymous {
+					switch p.Type.Kind() {
+					case reflect.String, reflect.Uint32, reflect.Float64, reflect.Int:
+						if i < (te - 1) {
+							fmt.Printf("%s%s| ",
+								String(p.Name).Cyan().Bold(),
+								buffer((le[0]+1), len(p.Name)))
+						} else {
+							fmt.Printf("%s%s",
+								String(p.Name).Cyan().Bold(),
+								buffer((le[0]+1), len(p.Name)))
+						}
+					}
+				}
+			}
+			fmt.Println("")
+		}
+		// Now let's dump our contents
+		for i := 0; i < typ.NumField(); i++ {
+			p := typ.Field(i)
+			if !p.Anonymous {
+				switch p.Type.Kind() {
+				case reflect.String, reflect.Uint32, reflect.Float64, reflect.Int:
+					value := fmt.Sprintf("%v", reflect.ValueOf(s).Field(i))
+					if i < (te - 1) {
+						fmt.Printf("%s%s| ",
+							value,
+							buffer((le[0]+1), len(value)))
+					} else {
+						fmt.Printf("%s%s\n",
+							value,
+							buffer((le[0]+1), len(value)))
+					}
+				}
+			}
+		}
+
+	}
+}
+
 func DumpWhisperFile(c *cli.Context) error {
 	for _, f := range c.Args() {
 		data := Metadata{}
@@ -61,32 +112,34 @@ func DumpWhisperFile(c *cli.Context) error {
 				})
 				p, e := db.DumpArchive(i)
 				if e != nil {
-					fmt.Printf("%s: Failed to read archive: %s\n", String("ERROR").Red().Bold(), e)
+					fmt.Printf("%s: Failed to read archive: %s\n",
+						String("ERROR").Red().Bold(), e)
 					return e
 				}
 				for _, point := range p {
-					data.Archives[i].Points = append(data.Archives[i].Points, Point{
-						Timestamp: point.Timestamp,
-						Value:     point.Value,
-						Time:      point.Time(),
-					})
+					data.Archives[i].Points = append(data.Archives[i].Points,
+						Point{
+							Timestamp: point.Timestamp,
+							Value:     point.Value,
+							Time:      point.Time(),
+						})
 				}
 			}
 		}
-		DumpStruct(data, true)
+		dumpStruct(data, true)
 		fmt.Println("")
 		for i, v := range data.Archives {
 			if i == 0 || c.Bool("P") {
-				DumpStruct(v, true)
+				dumpStruct(v, true)
 			} else {
-				DumpStruct(v, false)
+				dumpStruct(v, false)
 			}
 			if c.Bool("P") {
 				for n, p := range v.Points {
 					if n == 0 {
-						DumpStruct(p, true)
+						dumpStruct(p, true)
 					} else {
-						DumpStruct(p, false)
+						dumpStruct(p, false)
 					}
 				}
 			}

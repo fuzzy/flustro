@@ -82,6 +82,7 @@ func buffer(m int, h int) string {
 func listFiles(p string) (retv []string) {
 	cwd, _ := os.Getwd()
 	os.Chdir(p)
+	Info.Printf("Examinging directory: %s", p)
 	filepath.Walk(".", func(p string, i os.FileInfo, e error) error {
 		chkErr(e)
 		if !i.IsDir() {

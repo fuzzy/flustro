@@ -159,8 +159,8 @@ func Filler(c *cli.Context) error {
 				}
 			}
 
-			fmt.Println("\n",
-				(Overlap / (time.Now().Unix() - StartTime)),
+			fmt.Println("")
+			Info.Println((Overlap / (time.Now().Unix() - StartTime)),
 				"whisper files processed per second.")
 		} else {
 			if !backfillFile(args[0], args[1]) {

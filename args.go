@@ -10,7 +10,10 @@ import (
 // Putting this in the global scope let's the other source
 // files fill it in with their init() functions.
 
-var Commands []cli.Command
+var (
+	Commands  []cli.Command
+	StartTime int64
+)
 
 // Starting things rolling down the hill
 func main() {
@@ -32,5 +35,6 @@ func main() {
 	app.Commands = Commands
 
 	// Now let's do things
+	StartTime = time.Now().Unix()
 	app.Run(os.Args)
 }

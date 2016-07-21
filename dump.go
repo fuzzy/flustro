@@ -90,7 +90,7 @@ func DumpWhisperFile(c *cli.Context) error {
 		data := Metadata{}
 		db, err := whisper.Open(f)
 		if err != nil {
-			fmt.Println("Could not open whisper file:", err)
+			Error.Println(err)
 			return err
 		} else {
 			defer db.Close()
@@ -112,7 +112,7 @@ func DumpWhisperFile(c *cli.Context) error {
 				})
 				p, e := db.DumpArchive(i)
 				if e != nil {
-					Error(e.Error())
+					Error.Println(e.Error())
 					return e
 				}
 				for _, point := range p {

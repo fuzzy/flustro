@@ -8,11 +8,24 @@ import (
 	"runtime"
 	"time"
 
+	. "github.com/fuzzy/gocolor"
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/urfave/cli"
 )
 
-var Filled int
+var (
+	Filled  int64
+	Overlap int64
+)
+
+func ProgressIndicator(c int64, t int64) {
+	fmt.Printf("%s %d of %d (%6.02f%%) runtime: %dsec\r",
+		String("Info").Green().Bold(),
+		c,
+		t,
+		(float64(c)/float64(t))*100.00,
+		time.Now().Unix()-StartTime)
+}
 
 func fillWorker(d chan map[string]string) {
 	for {
@@ -22,12 +35,13 @@ func fillWorker(d chan map[string]string) {
 		} else {
 			if isFile(msg["SRC"]) && isFile(msg["DST"]) {
 				if !backfillFile(msg["SRC"], msg["DST"]) {
-					Error(fmt.Sprintf("S:%s D:%s - Backfill operation failed.",
+					Error.Printf("S:%s D:%s - Backfill operation failed.",
 						msg["SRC"],
-						msg["DST"]))
+						msg["DST"])
 					os.Exit(1)
 				} else {
 					Filled++
+					ProgressIndicator(Filled, Overlap)
 				}
 			}
 		}
@@ -48,7 +62,7 @@ func backfillFile(s string, d string) bool {
 	// Now for a series of checks, first to ensure that both
 	// files have the same number of archives in them.
 	if sDb.Header.Metadata.ArchiveCount != dDb.Header.Metadata.ArchiveCount {
-		Error("The files have a mismatched set of archives.")
+		Error.Println("The files have a mismatched set of archives.")
 		return false
 	}
 
@@ -64,12 +78,12 @@ func backfillFile(s string, d string) bool {
 					// ok, now let's get rolling through the archives
 					sp, se := sDb.DumpArchive(i)
 					if se != nil {
-						Error(se.Error())
+						Error.Println(se.Error())
 						os.Exit(1)
 					}
 					dp, de := dDb.DumpArchive(i)
 					if de != nil {
-						Error(de.Error())
+						Error.Println(de.Error())
 						os.Exit(1)
 					}
 					for idx := 0; idx < len(sp); idx++ {
@@ -115,10 +129,11 @@ func Filler(c *cli.Context) error {
 			}
 
 			// And display some stats
-			Info(fmt.Sprintf("srcDir: %d files, dstDir: %d files, %d overlap.",
+			Info.Printf("srcDir: %d files, dstDir: %d files, %d overlap.",
 				len(srcFiles),
 				len(dstFiles),
-				len(overlap)))
+				len(overlap))
+			Overlap = int64(len(overlap))
 
 			// Now we can push in all our data, and let our workers do their
 			// lovely little thing. Ahhhhh concurrency.
@@ -133,7 +148,7 @@ func Filler(c *cli.Context) error {
 			// the return channel and count things. Once we have all our
 			// backfill operations accounted for, we can reap all of our workers
 			// and carry on.
-			for Filled < len(overlap) {
+			for Filled < int64(len(overlap)) {
 				time.Sleep(1 * time.Second)
 			}
 			// And finally let's reap all our children
@@ -144,19 +159,22 @@ func Filler(c *cli.Context) error {
 				}
 			}
 
+			fmt.Println("\n",
+				(Overlap / (time.Now().Unix() - StartTime)),
+				"whisper files processed per second.")
 		} else {
 			if !backfillFile(args[0], args[1]) {
 				e := fmt.Sprintf("Error while backfilling.")
-				Error(e)
+				Error.Println(e)
 				return errors.New(e)
 			}
 		}
 	} else {
 		var e string
 		e = fmt.Sprintf("Wrong number of paramters given.")
-		Error(e)
-		Error(fmt.Sprintf("Try '%s help fill' for more information",
-			path.Base(os.Args[0])))
+		Error.Println(e)
+		Error.Printf("Try '%s help fill' for more information",
+			path.Base(os.Args[0]))
 		return errors.New(e)
 	}
 	return nil

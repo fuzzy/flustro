@@ -26,7 +26,7 @@ func isFile(p string) bool {
 
 func chkErr(e error) bool {
 	if e != nil {
-		Error(e.Error())
+		Error.Println(e.Error())
 		return false
 	} else {
 		return true

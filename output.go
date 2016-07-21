@@ -1,29 +1,30 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"os"
 
 	. "github.com/fuzzy/gocolor"
 )
 
-func Debug(s string) {
-	fmt.Println(String("DEBUG").Cyan().Bold(), s)
-}
+var (
+	Debug *log.Logger
+	Info  *log.Logger
+	Warn  *log.Logger
+	Error *log.Logger
+)
 
-func Info(s string) {
-	fmt.Println(String("INFO").Green().Bold(), s)
-}
-
-func Warn(s string) {
-	fmt.Println(String("WARNING").Yellow().Bold(), s)
-}
-
-func Error(s string) {
-	fmt.Println(String("ERROR").Red().Bold(), s)
-}
-
-func Fatal(s string) {
-	fmt.Println(String("FATAL").Red().Bold(), s)
-	os.Exit(1)
+func init() {
+	Debug = log.New(os.Stdout,
+		string(String("DEBUG ").Cyan().Bold()),
+		log.Lshortfile)
+	Info = log.New(os.Stdout,
+		string(String("Info ").Green().Bold()),
+		0)
+	Warn = log.New(os.Stderr,
+		string(String("Warning ").Yellow().Bold()),
+		0)
+	Error = log.New(os.Stderr,
+		string(String("Error ").Red().Bold()),
+		0)
 }

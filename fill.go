@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"sync"
 	"time"
 
 	. "github.com/fuzzy/gocolor"
@@ -14,6 +15,7 @@ import (
 )
 
 var (
+	Gascap  sync.Mutex
 	Filled  int64
 	Overlap int64
 )
@@ -46,8 +48,10 @@ func fillWorker(d chan map[string]string) {
 						msg["DST"])
 					os.Exit(1)
 				} else {
+					Gascap.Lock()
 					Filled++
 					ProgressIndicator(Filled, Overlap)
+					Gascap.Unlock()
 				}
 			}
 		}

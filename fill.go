@@ -19,12 +19,14 @@ var (
 )
 
 func ProgressIndicator(c int64, t int64) {
-	fmt.Printf("%s %d of %d (%6.02f%%) runtime: %dsec\r",
+	rtime := (time.Now().Unix() - StartTime)
+	fmt.Printf("%s %d of %d (%6.02f%%) runtime: %dsec @ %d/sec\r",
 		String("Info").Green().Bold(),
 		c,
 		t,
 		(float64(c)/float64(t))*100.00,
-		time.Now().Unix()-StartTime)
+		rtime,
+		(Filled / rtime))
 }
 
 func fillWorker(d chan map[string]string) {

@@ -137,6 +137,7 @@ func Filler(c *cli.Context) error {
 
 			// Now we can push in all our data, and let our workers do their
 			// lovely little thing. Ahhhhh concurrency.
+			StartTime = time.Now().Unix()
 			for i := 0; i < len(overlap); i++ {
 				dataCh <- map[string]string{
 					"SRC": fmt.Sprintf("%s/%s", args[0], overlap[i]),

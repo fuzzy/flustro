@@ -9,33 +9,67 @@ import (
 	"sync"
 	"time"
 
-	. "github.com/fuzzy/gocolor"
+	"github.com/dustin/go-humanize"
+	"github.com/fuzzy/gocolor"
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/urfave/cli"
 )
 
-var (
-	Gascap  sync.Mutex
-	Filled  int64
-	Overlap int64
-)
-
-func ProgressIndicator(c int64, t int64) {
-	rtime := (time.Now().Unix() - StartTime)
-	count := Filled
-	if rtime > 0 {
-		count = (Filled / rtime)
-	}
-	fmt.Printf("%s %d of %d (%6.02f%%) runtime: %dsec @ %d/sec\r",
-		String("Info").Green().Bold(),
-		c,
-		t,
-		(float64(c)/float64(t))*100.00,
-		rtime,
-		count)
+type FillState struct {
+	StartTime int64
+	Count     int64
+	CountLock sync.Mutex
+	CountChan chan bool
+	SrcTotal  int64
+	DstTotal  int64
+	Overlap   int64
 }
 
-func fillWorker(d chan map[string]string) {
+func (f FillState) Increment() {
+	f.CountLock.Lock()
+	f.Count++
+	f.CountChan <- true
+	f.CountLock.Unlock()
+}
+
+func (f FillState) DumpState() {
+	// grab our lock, this ensures accurate reporting, and gives a bit more
+	// of a concurrency throttle. This is not necessarily a bad thing.
+	f.CountLock.Lock()
+	r := (time.Now().Unix() - f.StartTime)
+	c := f.Count
+	if r > 0 {
+		c = (f.Count / r)
+	}
+	p := (float64(f.Count) / float64(f.Overlap)) * 100.00
+	fmt.Printf("%s %-6s/%-6s (%6.02f%%) in %d seconds @ %-6s/sec",
+		gocolor.String("Info").Green().Bold(),
+		humanize.Comma(f.Count),
+		humanize.Comma(f.Overlap),
+		p, HumanTime(int(r)), c)
+	f.CountLock.Unlock()
+}
+
+var (
+	State FillState
+)
+
+func stateWorker(t chan bool) {
+	for {
+		select {
+		case sig := <-State.CountChan:
+			if sig {
+				State.DumpState()
+			} else {
+				return
+			}
+		case <-t:
+			return
+		}
+	}
+}
+
+func fillWorker(d chan map[string]string, t chan bool) {
 	for {
 		msg := <-d
 		if msg["SRC"] == "__EXIT__" && msg["DST"] == "__EXIT__" {
@@ -48,10 +82,7 @@ func fillWorker(d chan map[string]string) {
 						msg["DST"])
 					os.Exit(1)
 				} else {
-					Gascap.Lock()
-					Filled++
-					ProgressIndicator(Filled, Overlap)
-					Gascap.Unlock()
+					State.Increment()
 				}
 			}
 		}
@@ -116,12 +147,14 @@ func Filler(c *cli.Context) error {
 	if len(c.Args()) == 2 {
 		args := c.Args()
 		if isDir(args[0]) && isDir(args[1]) {
-			Filled = 0
+			State.Count = 0
 
 			// First things first, let's spawn our pool of workers.
 			dataCh := make(chan map[string]string, 1)
+			timeout := make(chan bool, 30)
+			go stateWorker(timeout)
 			for i := 0; i < c.Int("j"); i++ {
-				go fillWorker(dataCh)
+				go fillWorker(dataCh, timeout)
 			}
 
 			// Let's get this dir walking in there then shall we?
@@ -143,7 +176,9 @@ func Filler(c *cli.Context) error {
 				len(srcFiles),
 				len(dstFiles),
 				len(overlap))
-			Overlap = int64(len(overlap))
+			State.Overlap = int64(len(overlap))
+			State.SrcTotal = int64(len(srcFiles))
+			State.DstTotal = int64(len(dstFiles))
 
 			// Now we can push in all our data, and let our workers do their
 			// lovely little thing. Ahhhhh concurrency.
@@ -159,7 +194,7 @@ func Filler(c *cli.Context) error {
 			// the return channel and count things. Once we have all our
 			// backfill operations accounted for, we can reap all of our workers
 			// and carry on.
-			for Filled < int64(len(overlap)) {
+			for State.Count < int64(len(overlap)) {
 				time.Sleep(1 * time.Second)
 			}
 			// And finally let's reap all our children
@@ -171,7 +206,7 @@ func Filler(c *cli.Context) error {
 			}
 
 			fmt.Println("")
-			Info.Println((Overlap / (time.Now().Unix() - StartTime)),
+			Info.Println((State.Overlap / (time.Now().Unix() - StartTime)),
 				"whisper files processed per second.")
 		} else {
 			if !backfillFile(args[0], args[1]) {

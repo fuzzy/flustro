@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -91,5 +92,37 @@ func listFiles(p string) (retv []string) {
 		return nil
 	})
 	os.Chdir(cwd)
+	return retv
+}
+
+func Strappend(p string, a string) string {
+	b := bytes.NewBufferString(p)
+	for i := 0; i < len(a); i++ {
+		b.WriteByte(a[i])
+	}
+	return b.String()
+}
+
+func HumanTime(s int) string {
+	tdesc := map[string]int{
+		"s": 1,
+		"m": 60,
+		"h": 60 * 60,
+		"d": (60 * 60) * 24,
+		"w": ((60 * 60) * 24) * 7,
+		"y": ((60 * 60) * 24) * 365,
+	}
+	keys := []string{"y", "w", "d", "h", "m", "s"}
+	retv := ""
+	for _, t := range keys {
+		val := (s / tdesc[t])
+		tgt := (val * tdesc[t])
+		if s >= tdesc[t] {
+			retv = Strappend(retv, fmt.Sprintf("%02d%s", val, t))
+			s = (s - tgt)
+		} else {
+			retv = Strappend(retv, fmt.Sprintf("00%s", t))
+		}
+	}
 	return retv
 }

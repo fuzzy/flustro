@@ -19,18 +19,11 @@ type Dirstate struct {
 	Contents map[string][]string
 }
 
-type Crossover struct {
-	Source   string
-	Dest     string
-	Contents map[string][]string
-}
-
 func Filler() {
 	for {
 		select {
 		case msg := <-DataChan:
-			Debug <- fmt.Sprintf("DATA %+v", msg["Source"])
-			Debug <- fmt.Sprintf("DATA %+v", msg["Destination"])
+			Debug <- fmt.Sprintf("Backfill: %s -> %s", msg["Source"], msg["Destination"])
 		case <-FillerSig:
 			FillerSig <- true
 			return
@@ -44,42 +37,48 @@ func BackFill(c *cli.Context) {
 		os.Exit(1)
 	} else {
 		// declare our variables
-		var srcObj interface{}
-		var dstObj interface{}
-
-		// let's get our source object
+		var srcObj Dirstate
+		var dstObj Dirstate
 		srcDir := c.Args().Get(0)
-		if isDir(srcDir) {
-			srcObj = ListDir(srcDir)
-		} else if isFile(srcDir) {
-			srcObj = srcDir
-		} else {
-			Error <- fmt.Sprintf("%s is not a file or directory.", srcDir)
-		}
-
-		// and our dest object
 		dstDir := c.Args().Get(1)
-		if isDir(dstDir) {
-			dstObj = ListDir(fmt.Sprintf("%s", dstDir))
-		} else if isFile(dstDir) {
-			dstObj = fmt.Sprintf("%s", dstDir)
-		} else {
-			Error <- fmt.Sprintf("%s is not a file or directory.", dstDir)
-		}
 
-		// Now let's spawn our pool of workers if our args are both directories
-		for i := 0; i < c.Int("j"); i++ {
+		// Now let's do the heavy lifting
+		if isDir(srcDir) && isDir(dstDir) {
+			// First let's get our dir contents
+			srcObj = ListDir(srcDir)
+			dstObj = ListDir(dstDir)
+			// then spawn our worker pool, and get to processing
+			for i := 0; i < c.Int("j"); i++ {
+				go Filler()
+			}
+			// next we'll start processing through our srcObj and dstObj lists and
+			// backfill everything that's present in both locations
+			for k, _ := range srcObj.Contents {
+				if _, ok := dstObj.Contents[k]; ok {
+					for _, v := range srcObj.Contents[k] {
+						for _, dv := range dstObj.Contents[k] {
+							if v == dv {
+								DataChan <- map[string]string{
+									"Source":      fmt.Sprintf("%s/%s/%s", srcObj.Location, k, v),
+									"Destination": fmt.Sprintf("%s/%s/%s", dstObj.Location, k, v),
+								}
+							}
+						}
+					}
+				}
+			}
+		} else if isFile(srcDir) && isFile(dstDir) {
+			// we only need one worker for this job
 			go Filler()
+			DataChan <- map[string]string{
+				"Source":      srcDir,
+				"Destination": dstDir,
+			}
+		} else {
+			Error <- fmt.Sprintf("SRC and DST must be either both files or both dirs.")
 		}
-		// next we'll start processing through our srcObj and dstObj lists and
-		// backfill everything that's present in both locations
-		// for k, _ := range srcObj.Contents {
 
-		// or simply spawn a single Filler and let it do it's job if both args are files
-		go Filler()
-		data := map[string]string{"Source": fmt.Sprintf("%+v", srcObj), "Destination": fmt.Sprintf("%+v", dstObj)}
-		DataChan <- data
-		time.Sleep(1 * time.Second)
+		time.Sleep(500 * time.Millisecond)
 	}
 	return
 }

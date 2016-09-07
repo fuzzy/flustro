@@ -1,12 +1,13 @@
 package main
 
+/*
 import (
 	"fmt"
 	"path"
 	"reflect"
 	"time"
 
-	. "github.com/fuzzy/gocolor"
+	. "github.com/fuzzy/gcl"
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/urfave/cli"
 )
@@ -165,3 +166,4 @@ func init() {
 		Action:          DumpWhisperFile,
 	})
 }
+*/

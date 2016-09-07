@@ -1,6 +1,91 @@
 package main
 
 import (
+	"fmt"
+	"os"
+	"runtime"
+	"time"
+
+	"github.com/urfave/cli"
+)
+
+var (
+	DataChan  chan map[string]string
+	FillerSig chan bool
+)
+
+type Dirstate struct {
+	Location string
+	Contents map[string][]string
+}
+
+type Crossover struct {
+	Source   string
+	Dest     string
+	Contents map[string][]string
+}
+
+func Filler() {
+	for {
+		select {
+		case msg := <-DataChan:
+			Debug <- fmt.Sprintf("DATA %+v", msg["Source"])
+			Debug <- fmt.Sprintf("DATA %+v", msg["Destination"])
+		case <-FillerSig:
+			FillerSig <- true
+			return
+		}
+	}
+}
+
+func BackFill(c *cli.Context) {
+	if len(c.Args()) < 2 {
+		Error <- "Invalid arguments. See 'flustro help fill' for more information."
+		os.Exit(1)
+	} else {
+		// declare our variables
+		var srcObj interface{}
+		var dstObj interface{}
+
+		// let's get our source object
+		srcDir := c.Args().Get(0)
+		if isDir(srcDir) {
+			srcObj = ListDir(srcDir)
+		} else if isFile(srcDir) {
+			srcObj = srcDir
+		} else {
+			Error <- fmt.Sprintf("%s is not a file or directory.", srcDir)
+		}
+
+		// and our dest object
+		dstDir := c.Args().Get(1)
+		if isDir(dstDir) {
+			dstObj = ListDir(fmt.Sprintf("%s", dstDir))
+		} else if isFile(dstDir) {
+			dstObj = fmt.Sprintf("%s", dstDir)
+		} else {
+			Error <- fmt.Sprintf("%s is not a file or directory.", dstDir)
+		}
+
+		// Now let's spawn our pool of workers if our args are both directories
+		for i := 0; i < c.Int("j"); i++ {
+			go Filler()
+		}
+		// next we'll start processing through our srcObj and dstObj lists and
+		// backfill everything that's present in both locations
+		// for k, _ := range srcObj.Contents {
+
+		// or simply spawn a single Filler and let it do it's job if both args are files
+		go Filler()
+		data := map[string]string{"Source": fmt.Sprintf("%+v", srcObj), "Destination": fmt.Sprintf("%+v", dstObj)}
+		DataChan <- data
+		time.Sleep(1 * time.Second)
+	}
+	return
+}
+
+/*
+import (
 	"errors"
 	"fmt"
 	"os"
@@ -10,7 +95,7 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
-	"github.com/fuzzy/gocolor"
+	"github.com/fuzzy/gcl"
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/urfave/cli"
 )
@@ -43,7 +128,7 @@ func (f FillState) DumpState() {
 	}
 	p := (float64(f.Count) / float64(f.Overlap)) * 100.00
 	fmt.Printf("%s %-6s/%-6s (%6.02f%%) in %d seconds @ %-6s/sec",
-		gocolor.String("Info").Green().Bold(),
+		gcl.String("Info").Green().Bold(),
 		humanize.Comma(f.Count),
 		humanize.Comma(f.Overlap),
 		p, HumanTime(int(r)), c)
@@ -225,8 +310,9 @@ func Filler(c *cli.Context) error {
 	}
 	return nil
 }
-
+*/
 func init() {
+	DataChan = make(chan map[string]string)
 	Commands = append(Commands, cli.Command{
 		Name:        "fill",
 		Aliases:     []string{"f"},
@@ -239,11 +325,10 @@ func init() {
 				Usage: "Number of workers (for directory recursion)",
 				Value: runtime.GOMAXPROCS(0),
 			},
-			cli.BoolFlag{Name: "c", Usage: "Prevent colors from being used"},
 		},
 		SkipFlagParsing: false,
 		HideHelp:        false,
 		Hidden:          false,
-		Action:          Filler,
+		Action:          BackFill,
 	})
 }

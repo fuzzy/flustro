@@ -11,12 +11,16 @@ import (
 // files fill it in with their init() functions.
 
 var (
-	Commands  []cli.Command
-	StartTime int64
+	Commands   []cli.Command
+	StartTime  int64
+	StripColor bool
 )
 
 // Starting things rolling down the hill
 func main() {
+	// start our outputter thread
+	go Outputter()
+
 	// Define our app container
 	app := cli.NewApp()
 
@@ -33,8 +37,12 @@ func main() {
 	}
 	app.Copyright = "(c) 2016 Mike 'Fuzzy' Partin"
 	app.Commands = Commands
+	app.Flags = []cli.Flag{
+		cli.BoolFlag{Name: "c", Usage: "Disable colors in output", Destination: &StripColor},
+	}
 
 	// Now let's do things
 	StartTime = time.Now().Unix()
 	app.Run(os.Args)
+	time.Sleep(500 * time.Millisecond)
 }

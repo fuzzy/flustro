@@ -14,6 +14,7 @@ var (
 	Commands   []cli.Command
 	StartTime  int64
 	StripColor bool
+	ShowDebug  bool
 )
 
 // Starting things rolling down the hill
@@ -38,7 +39,8 @@ func main() {
 	app.Copyright = "(c) 2016 Mike 'Fuzzy' Partin"
 	app.Commands = Commands
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{Name: "c", Usage: "Disable colors in output", Destination: &StripColor},
+		cli.BoolFlag{Name: "D", Usage: "Show debugging messages", Destination: &ShowDebug},
+		cli.BoolFlag{Name: "C", Usage: "Disable colors in output", Destination: &StripColor},
 	}
 
 	// Now let's do things

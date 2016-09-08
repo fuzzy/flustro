@@ -17,29 +17,34 @@ var (
 
 func Outputter() {
 	for {
+		ws := consInfo()
 		select {
 		case msg := <-Info:
+			buff := (int(ws.Col) - (len(msg) + 4))
 			if !StripColor {
-				fmt.Printf("%s %s\n", String(">>").Bold().Green(), msg)
+				fmt.Printf("%s %s%s\n", String(">>").Bold().Green(), msg, padding(buff))
 			} else {
-				fmt.Printf("I> %s\n", msg)
+				fmt.Printf(">> %s%s\n", msg, padding(buff))
 			}
 		case msg := <-Error:
+			buff := (int(ws.Col) - (len(msg) + 4))
 			if !StripColor {
-				fmt.Printf("%s %s\n", String(">>").Bold().Red(), msg)
+				fmt.Printf("%s %s%s\n", String("!!").Bold().Red(), msg, padding(buff))
 			} else {
-				fmt.Printf("E> %s\n", msg)
+				fmt.Printf("!! %s%s\n", msg, padding(buff))
 			}
 		case msg := <-Debug:
-			if !StripColor {
-				fmt.Printf("%s %s\n", String(">>").Bold().Cyan(), msg)
-			} else {
-				fmt.Printf("D> %s\n", msg)
+			buff := (int(ws.Col) - (len(msg) + 4))
+			if ShowDebug {
+				if !StripColor {
+					fmt.Printf("%s %s%s|\n", String("##").Bold().Cyan(), msg, padding(buff))
+				} else {
+					fmt.Printf("## %s%s\n", msg, padding(buff))
+				}
 			}
 		case msg := <-Progress:
-			ws := consInfo()
-			buff := (int(ws.Col) - (len(msg) + 1))
-			fmt.Printf("%s %s%s\r", String(">").Bold().Green(), msg, padding(buff))
+			buff := (int(ws.Col) - (len(msg) + 4))
+			fmt.Printf("%s %s%s\r", String(">").Bold().Blue(), msg, padding(buff))
 		case <-OutputSig:
 			fmt.Println("signal")
 		}
@@ -47,9 +52,9 @@ func Outputter() {
 }
 
 func init() {
-	Info = make(chan string, 255)
-	Error = make(chan string, 255)
-	Debug = make(chan string, 255)
-	Progress = make(chan string, 255)
+	Info = make(chan string)
+	Error = make(chan string)
+	Debug = make(chan string)
+	Progress = make(chan string)
 	OutputSig = make(chan os.Signal, 1)
 }

@@ -8,13 +8,14 @@ import (
 	"time"
 
 	"github.com/kisielk/whisper-go/whisper"
+	"github.com/splatpm/subhuman"
 	"github.com/urfave/cli"
 )
 
 var (
 	DataChan  chan map[string]string
 	FillerSig chan bool
-	Count     int32
+	Count     int64
 	Mutex     *sync.Mutex
 )
 
@@ -44,9 +45,6 @@ func Filler() {
 				Error <- fmt.Sprintf("%s: %s", msg["Destination"], dErr.Error())
 				os.Exit(1)
 			}
-			// Defer their closings
-			defer sDb.Close()
-			defer dDb.Close()
 
 			// Now for a series of checks, first to ensure that both
 			// files have the same number of archives in them.
@@ -87,6 +85,12 @@ func Filler() {
 					}
 				}
 			}
+
+			// Defer their closings
+			sDb.Close()
+			dDb.Close()
+
+			// and increment our counter
 			Mutex.Lock()
 			Count++
 			Mutex.Unlock()
@@ -147,7 +151,7 @@ func BackFill(c *cli.Context) {
 				overlap.Source,
 				overlap.Destination)
 			time.Sleep(500 * time.Millisecond)
-			start_t := int32(time.Now().Unix())
+			start_t := int64(time.Now().Unix())
 			for k, v := range overlap.Contents {
 				for _, f := range v {
 					DataChan <- map[string]string{
@@ -157,7 +161,7 @@ func BackFill(c *cli.Context) {
 				}
 			}
 			for {
-				runtime := (int32(time.Now().Unix()) - start_t)
+				runtime := (int64(time.Now().Unix()) - start_t)
 				if len(DataChan) == 0 {
 					time.Sleep(2 * time.Second)
 					runrate := (float32(overlap_c) / float32(runtime))
@@ -166,7 +170,7 @@ func BackFill(c *cli.Context) {
 					return
 				}
 				runrate := (float32(Count) / float32(runtime))
-				Progress <- fmt.Sprintf("%d files processed in %d sec @ %.02f/sec.", Count, runtime, runrate)
+				Progress <- fmt.Sprintf("%d files processed in %s @ %.02f/sec.", Count, subhuman.HumanTimeColon(runtime), runrate)
 				time.Sleep(1 * time.Second)
 			}
 		} else if isFile(srcDir) && isFile(dstDir) {

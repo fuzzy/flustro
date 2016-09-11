@@ -1,13 +1,11 @@
 package main
 
-/*
 import (
 	"fmt"
 	"path"
 	"reflect"
 	"time"
 
-	. "github.com/fuzzy/gcl"
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/urfave/cli"
 )
@@ -44,26 +42,24 @@ func dumpStruct(s interface{}, h bool) {
 		le, te := longestElement(s)
 		// Now let's print our header
 		if h {
+			output := ""
 			for i := 0; i < typ.NumField(); i++ {
 				p := typ.Field(i)
 				if !p.Anonymous {
 					switch p.Type.Kind() {
 					case reflect.String, reflect.Uint32, reflect.Float64, reflect.Int:
 						if i < (te - 1) {
-							fmt.Printf("%s%s| ",
-								String(p.Name).Cyan().Bold(),
-								buffer((le[0]+1), len(p.Name)))
+							output = Strappend(output, fmt.Sprintf("%s%s| ", p.Name, buffer((le[0]+1), len(p.Name))))
 						} else {
-							fmt.Printf("%s%s",
-								String(p.Name).Cyan().Bold(),
-								buffer((le[0]+1), len(p.Name)))
+							output = Strappend(output, fmt.Sprintf("%s%s", p.Name, buffer((le[0]+1), len(p.Name))))
 						}
 					}
 				}
 			}
-			fmt.Println("")
+			Info <- output
 		}
 		// Now let's dump our contents
+		output := ""
 		for i := 0; i < typ.NumField(); i++ {
 			p := typ.Field(i)
 			if !p.Anonymous {
@@ -71,13 +67,11 @@ func dumpStruct(s interface{}, h bool) {
 				case reflect.String, reflect.Uint32, reflect.Float64, reflect.Int:
 					value := fmt.Sprintf("%v", reflect.ValueOf(s).Field(i))
 					if i < (te - 1) {
-						fmt.Printf("%s%s| ",
-							value,
-							buffer((le[0]+1), len(value)))
+						output = Strappend(output, fmt.Sprintf("%s%s| ", value, buffer((le[0]+1), len(value))))
 					} else {
-						fmt.Printf("%s%s\n",
-							value,
-							buffer((le[0]+1), len(value)))
+						output = Strappend(output, fmt.Sprintf("%s%s", value, buffer((le[0]+1), len(value))))
+						Info <- output
+						output = ""
 					}
 				}
 			}
@@ -91,7 +85,7 @@ func DumpWhisperFile(c *cli.Context) error {
 		data := Metadata{}
 		db, err := whisper.Open(f)
 		if err != nil {
-			Error.Println(err)
+			Error <- fmt.Sprintln(err)
 			return err
 		} else {
 			defer db.Close()
@@ -113,7 +107,7 @@ func DumpWhisperFile(c *cli.Context) error {
 				})
 				p, e := db.DumpArchive(i)
 				if e != nil {
-					Error.Println(e.Error())
+					Error <- fmt.Sprintln(e.Error())
 					return e
 				}
 				for _, point := range p {
@@ -127,6 +121,7 @@ func DumpWhisperFile(c *cli.Context) error {
 			}
 		}
 		dumpStruct(data, true)
+		time.Sleep(500 * time.Millisecond)
 		fmt.Println("")
 		for i, v := range data.Archives {
 			if i == 0 || c.Bool("P") {
@@ -144,7 +139,6 @@ func DumpWhisperFile(c *cli.Context) error {
 				}
 			}
 		}
-		fmt.Printf("\n\n")
 	}
 	return nil
 }
@@ -158,7 +152,6 @@ func init() {
 		ArgsUsage:   "<whisperFile>",
 		Flags: []cli.Flag{
 			cli.BoolFlag{Name: "P", Usage: "Dump data points"},
-			cli.BoolFlag{Name: "c", Usage: "Disable colors in output"},
 		},
 		SkipFlagParsing: false,
 		HideHelp:        false,
@@ -166,4 +159,3 @@ func init() {
 		Action:          DumpWhisperFile,
 	})
 }
-*/

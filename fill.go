@@ -158,6 +158,12 @@ func BackFill(c *cli.Context) {
 						"Source":      fmt.Sprintf("%s/%s/%s", overlap.Source, k, f),
 						"Destination": fmt.Sprintf("%s/%s/%s", overlap.Destination, k, f),
 					}
+					runtime := (int64(time.Now().Unix()) - start_t)
+					if len(DataChan) != 0 {
+						runrate := (float32(Count) / float32(runtime))
+						Progress <- fmt.Sprintf("%d files processed in %s @ %.02f/sec.",
+							Count, subhuman.HumanTimeColon(runtime), runrate)
+					}
 				}
 			}
 			for {
@@ -165,12 +171,14 @@ func BackFill(c *cli.Context) {
 				if len(DataChan) == 0 {
 					time.Sleep(2 * time.Second)
 					runrate := (float32(overlap_c) / float32(runtime))
-					Info <- fmt.Sprintf("%d files processed in %d sec @ %.02f/sec.", overlap_c, runtime, runrate)
+					Info <- fmt.Sprintf("%d files processed in %s sec @ %.02f/sec.",
+						overlap_c, subhuman.HumanTimeColon(runtime), runrate)
 					time.Sleep(100 * time.Millisecond)
 					return
 				}
 				runrate := (float32(Count) / float32(runtime))
-				Progress <- fmt.Sprintf("%d files processed in %s @ %.02f/sec.", Count, subhuman.HumanTimeColon(runtime), runrate)
+				Progress <- fmt.Sprintf("%d files processed in %s @ %.02f/sec.",
+					Count, subhuman.HumanTimeColon(runtime), runrate)
 				time.Sleep(1 * time.Second)
 			}
 		} else if isFile(srcDir) && isFile(dstDir) {
@@ -190,7 +198,7 @@ func BackFill(c *cli.Context) {
 }
 
 func init() {
-	DataChan = make(chan map[string]string, 8192)
+	DataChan = make(chan map[string]string, 128)
 	Mutex = &sync.Mutex{}
 	Commands = append(Commands, cli.Command{
 		Name:        "fill",

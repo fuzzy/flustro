@@ -195,7 +195,7 @@ func init() {
 		ArgsUsage:   "<src(File|Dir)> <dst(File|Dir)>",
 		Flags: []cli.Flag{
 			cli.IntFlag{
-				Name:  "j",
+				Name:  "J",
 				Usage: "Number of workers (for directory recursion)",
 				Value: (runtime.GOMAXPROCS(0)),
 			},

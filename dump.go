@@ -146,7 +146,7 @@ func DumpWhisperFile(c *cli.Context) error {
 func init() {
 	Commands = append(Commands, cli.Command{
 		Name:        "dump",
-		Aliases:     []string{"d"},
+		Aliases:     []string{"du"},
 		Usage:       "Dump metadata, and optionally data of a whisper file",
 		Description: "Dump the metadata, such as retention periods, and point data from a given whisper file",
 		ArgsUsage:   "<whisperFile>",

@@ -189,7 +189,7 @@ func init() {
 	MgMutex = &sync.Mutex{}
 	Commands = append(Commands, cli.Command{
 		Name:        "merge",
-		Aliases:     []string{"m"},
+		Aliases:     []string{"me"},
 		Usage:       "Merge datapoints in the dst from the src",
 		Description: "Merge datapoints in the dst from the src",
 		ArgsUsage:   "<src(File|Dir)> <dst(File|Dir)>",

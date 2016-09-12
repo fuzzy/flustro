@@ -202,7 +202,7 @@ func init() {
 	Mutex = &sync.Mutex{}
 	Commands = append(Commands, cli.Command{
 		Name:        "fill",
-		Aliases:     []string{"f"},
+		Aliases:     []string{"fi"},
 		Usage:       "Backfill datapoints in the dst from the src",
 		Description: "Backfill datapoints in the dst from the src",
 		ArgsUsage:   "<src(File|Dir)> <dst(File|Dir)>",

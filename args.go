@@ -39,8 +39,8 @@ func main() {
 	app.Copyright = "(c) 2016 Mike 'Fuzzy' Partin"
 	app.Commands = Commands
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{Name: "D", Usage: "Show debugging messages", Destination: &ShowDebug},
-		cli.BoolFlag{Name: "C", Usage: "Disable colors in output", Destination: &StripColor},
+		cli.BoolFlag{Name: "d", Usage: "Show debugging messages", Destination: &ShowDebug},
+		cli.BoolFlag{Name: "c", Usage: "Disable colors in output", Destination: &StripColor},
 	}
 
 	// Now let's do things

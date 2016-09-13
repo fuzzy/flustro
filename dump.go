@@ -121,7 +121,7 @@ func DumpWhisperFile(c *cli.Context) error {
 			}
 		}
 		dumpStruct(data, true)
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 		fmt.Println("")
 		for i, v := range data.Archives {
 			if i == 0 || c.Bool("P") {
@@ -130,11 +130,13 @@ func DumpWhisperFile(c *cli.Context) error {
 				dumpStruct(v, false)
 			}
 			if c.Bool("P") {
-				for n, p := range v.Points {
-					if n == 0 {
-						dumpStruct(p, true)
-					} else {
-						dumpStruct(p, false)
+				if c.Int("A") == 40960 || c.Int("A") == i {
+					for n, p := range v.Points {
+						if n == 0 {
+							dumpStruct(p, true)
+						} else {
+							dumpStruct(p, false)
+						}
 					}
 				}
 			}
@@ -152,6 +154,7 @@ func init() {
 		ArgsUsage:   "<whisperFile>",
 		Flags: []cli.Flag{
 			cli.BoolFlag{Name: "P", Usage: "Dump data points"},
+			cli.IntFlag{Name: "A", Usage: "Archive # to dump. (Requires -P)", Value: 40960},
 		},
 		SkipFlagParsing: false,
 		HideHelp:        false,

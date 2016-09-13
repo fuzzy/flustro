@@ -29,10 +29,18 @@ $ flustro dump -P whisper/collectd/hostname/cpu-0/user.wsp
 >> Archive        | Offset         | NumPoints      | Interval       | Retention      | Size                       
 >> 0              | 76             | 60480          | 10             | 604800         | 725760                     
 >> Timestamp       | Value                                                                                         
->> 1471018620      | 10.298661174047373                                                                            
->> 1471018630      | 9.793814432989691                                                                             
 >> 1471018640      | 10.199789695057834                                                                            
 >> 1471018650      | 10.031023784901757
+...
+
+$ flustro dump -P -A 2 whisper/collectd/hostname/cpu-0/user.wsp
+>> File           | AggMethod      | MaxRetention   | NumArchives                                                  
+>> system_pct.wsp | average        | 94608000       | 5                                                            
+
+>> Archive        | Offset         | NumPoints      | Interval       | Retention      | Size                       
+>> 2              | 76             | 60480          | 10             | 604800         | 725760                     
+>> Timestamp       | Value                                                                                         
+>> 1471018620      | 10.298661174047373                                                                            
 ....
 ```
 

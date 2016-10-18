@@ -13,7 +13,12 @@ var (
 	Debug     chan string
 	Progress  chan string
 	OutputSig chan os.Signal
+	Prompts   map[string]string
 )
+
+func NewInfo(m string) {
+	fmt.Printf("%s %s\n", Prompts["info"], m)
+}
 
 func Outputter() {
 	for {
@@ -52,6 +57,9 @@ func Outputter() {
 }
 
 func init() {
+	Prompts = make(map[string]string)
+	Prompts["info"] = fmt.Sprintf("%s%s%s", String(".").Cyan(), String(".").Bold().Cyan(), String(".").Bold().White())
+
 	Info = make(chan string)
 	Error = make(chan string)
 	Debug = make(chan string)

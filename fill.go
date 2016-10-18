@@ -5,18 +5,15 @@ import (
 	"os"
 	"runtime"
 	"sync"
-	"time"
 
 	"github.com/kisielk/whisper-go/whisper"
-	"github.com/splatpm/subhuman"
 	"github.com/urfave/cli"
 )
 
 var (
-	DataChan  chan map[string]string
-	FillerSig chan bool
-	Count     int64
-	Mutex     *sync.Mutex
+	fillJobs int
+	maxFills int
+	fillLock *sync.Mutex
 )
 
 type Dirstate struct {
@@ -30,76 +27,80 @@ type Overlap struct {
 	Contents    map[string][]string
 }
 
-func Filler() {
-	for {
-		select {
-		case msg := <-DataChan:
-			Debug <- fmt.Sprintf("Backfill: %s -> %s", msg["Source"], msg["Destination"])
+func backFill(src string, dst string) error {
+	// open our file handles
+	sDb, sErr := whisper.Open(src)
+	dDb, dErr := whisper.Open(dst)
+	// check our error status
+	if sErr != nil {
+		return sErr
+	} else if dErr != nil {
+		return dErr
+	}
+	// defer db closes
+	defer sDb.Close()
+	defer dDb.Close()
 
-			// Open our filehandles
-			sDb, sErr := whisper.Open(msg["Source"])
-			dDb, dErr := whisper.Open(msg["Destination"])
-			if !chkErr(sErr) {
-				Error <- fmt.Sprintf("%s: %s", msg["Source"], sErr.Error())
-			} else if !chkErr(dErr) {
-				Error <- fmt.Sprintf("%s: %s", msg["Destination"], dErr.Error())
-				os.Exit(1)
-			}
-
-			// Now for a series of checks, first to ensure that both
-			// files have the same number of archives in them.
-			if sDb.Header.Metadata.ArchiveCount != dDb.Header.Metadata.ArchiveCount {
-				Error <- fmt.Sprintln("The files have a mismatched set of archives.")
-			} else {
-				// Now we'll start processing the archives, checking as we go to see if they
-				// are matched. That way we at least fill in what we can, possibly....
-				for i, a := range sDb.Header.Archives {
-					// The offset
-					if a.Offset == dDb.Header.Archives[i].Offset {
-						// and the number of points
-						if a.Points == dDb.Header.Archives[i].Points {
-							// and finally the interval
-							if a.SecondsPerPoint == dDb.Header.Archives[i].SecondsPerPoint {
-								// ok, now let's get rolling through the archives
-								sp, se := sDb.DumpArchive(i)
-								if se != nil {
-									Error <- fmt.Sprintf("%s: %s", msg["Source"], se.Error())
-									os.Exit(1)
-								}
-								dp, de := dDb.DumpArchive(i)
-								if de != nil {
-									Error <- fmt.Sprintln(de.Error())
-									os.Exit(1)
-								}
-								for idx := 0; idx < len(sp); idx++ {
-									if sp[idx].Timestamp != 0 && sp[idx].Value != 0 {
-										if dp[idx].Timestamp == 0 || dp[idx].Value == 0 {
-											dp[idx].Timestamp = sp[idx].Timestamp
-											dp[idx].Value = sp[idx].Value
-											dDb.Update(dp[idx])
-										}
-									}
-								}
+	// now for each archive in src, if there's one that matches in dst, let's backfill
+	for sIdx, sArc := range sDb.Header.Archives {
+		for dIdx, dArc := range dDb.Header.Archives {
+			// if we hit this we have found a compatible archive
+			if sArc.Points == dArc.Points && sArc.SecondsPerPoint == dArc.SecondsPerPoint {
+				sp, se := sDb.DumpArchive(sIdx)
+				if se != nil {
+					return se
+				}
+				dp, de := dDb.DumpArchive(dIdx)
+				if de != nil {
+					return de
+				}
+				// for every point in the src archive
+				for sidx := 0; sidx < len(sp); sidx++ {
+					// check all the points in the dst archive
+					for didx := 0; didx < len(dp); didx++ {
+						// if any dst point has the same timestamp
+						if sp[sidx].Timestamp == dp[didx].Timestamp {
+							// and the values aren't the same
+							if dp[didx].Value != sp[sidx].Value {
+								// update the dst
+								dp[didx].Value = sp[sidx].Value
 							}
 						}
 					}
 				}
 			}
-
-			// Defer their closings
-			sDb.Close()
-			dDb.Close()
-
-			// and increment our counter
-			Mutex.Lock()
-			Count++
-			Mutex.Unlock()
-		case <-FillerSig:
-			FillerSig <- true
-			return
 		}
 	}
+
+	// and finally let the caller know nothing went wrong.
+	return nil
 }
+
+func BackFill(c *cli.Context) {
+	if len(c.Args()) < 2 {
+		fmt.Println("You fucked up, look at the help output.")
+	} else {
+		srcArg := c.Args().Get(0)
+		dstArg := c.Args().Get(1)
+		// if we requested more jobs than the default, make sure we update that
+		if c.Int("j") > maxFills {
+			maxFills = c.Int("j")
+		}
+		// if both our arguments are files
+		if isFile(srcArg) && isFile(dstArg) {
+			NewInfo(fmt.Sprintf("Backfill: %s -> %s", srcArg, dstArg))
+			backFill(srcArg, dstArg)
+		} else if isDir(srcArg) && isDir(dstArg) {
+			return
+		} else {
+			fmt.Println("You cannot mix files and directories as src and dst.")
+			os.Exit(1)
+		}
+	}
+	return
+}
+
+/*
 
 func BackFill(c *cli.Context) {
 	if len(c.Args()) < 2 {
@@ -150,36 +151,13 @@ func BackFill(c *cli.Context) {
 				overlap_c,
 				overlap.Source,
 				overlap.Destination)
-			time.Sleep(500 * time.Millisecond)
-			start_t := int64(time.Now().Unix())
 			for k, v := range overlap.Contents {
 				for _, f := range v {
 					DataChan <- map[string]string{
 						"Source":      fmt.Sprintf("%s/%s/%s", overlap.Source, k, f),
 						"Destination": fmt.Sprintf("%s/%s/%s", overlap.Destination, k, f),
 					}
-					runtime := (int64(time.Now().Unix()) - start_t)
-					if len(DataChan) != 0 {
-						runrate := (float32(Count) / float32(runtime))
-						Progress <- fmt.Sprintf("%d files processed in %s @ %.02f/sec.",
-							Count, subhuman.HumanTimeColon(runtime), runrate)
-					}
 				}
-			}
-			for {
-				runtime := (int64(time.Now().Unix()) - start_t)
-				if len(DataChan) == 0 {
-					time.Sleep(2 * time.Second)
-					runrate := (float32(overlap_c) / float32(runtime))
-					Info <- fmt.Sprintf("%d files processed in %s sec @ %.02f/sec.",
-						overlap_c, subhuman.HumanTimeColon(runtime), runrate)
-					time.Sleep(100 * time.Millisecond)
-					return
-				}
-				runrate := (float32(Count) / float32(runtime))
-				Progress <- fmt.Sprintf("%d files processed in %s @ %.02f/sec.",
-					Count, subhuman.HumanTimeColon(runtime), runrate)
-				time.Sleep(1 * time.Second)
 			}
 		} else if isFile(srcDir) && isFile(dstDir) {
 			// we only need one worker for this job
@@ -197,20 +175,22 @@ func BackFill(c *cli.Context) {
 	return
 }
 
+*/
 func init() {
-	DataChan = make(chan map[string]string, 128)
-	Mutex = &sync.Mutex{}
+	fillJobs = 0
+	maxFills = runtime.GOMAXPROCS(0) * 2
+	fillLock = &sync.Mutex{}
 	Commands = append(Commands, cli.Command{
 		Name:        "fill",
-		Aliases:     []string{"fi"},
+		Aliases:     []string{"f"},
 		Usage:       "Backfill datapoints in the dst from the src",
 		Description: "Backfill datapoints in the dst from the src",
 		ArgsUsage:   "<src(File|Dir)> <dst(File|Dir)>",
 		Flags: []cli.Flag{
 			cli.IntFlag{
-				Name:  "J",
+				Name:  "j",
 				Usage: "Number of workers (for directory recursion)",
-				Value: (runtime.GOMAXPROCS(0) * 2),
+				Value: runtime.GOMAXPROCS(0) * 2,
 			},
 		},
 		SkipFlagParsing: false,

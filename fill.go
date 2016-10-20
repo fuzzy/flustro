@@ -5,13 +5,16 @@ import (
 	"os"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/kisielk/whisper-go/whisper"
+	"github.com/splatpm/subhuman"
 	"github.com/urfave/cli"
 )
 
 var (
 	fillJobs int
+	doneJobs int
 	maxFills int
 	fillLock *sync.Mutex
 )
@@ -28,6 +31,13 @@ type Overlap struct {
 }
 
 func backFill(src string, dst string) error {
+	// get the lock on our jobs tracker
+	fillLock.Lock()
+	// increment the tracker
+	fillJobs++
+	// and release the lock
+	fillLock.Unlock()
+
 	// open our file handles
 	sDb, sErr := whisper.Open(src)
 	dDb, dErr := whisper.Open(dst)
@@ -40,30 +50,34 @@ func backFill(src string, dst string) error {
 	// defer db closes
 	defer sDb.Close()
 	defer dDb.Close()
-
-	// now for each archive in src, if there's one that matches in dst, let's backfill
-	for sIdx, sArc := range sDb.Header.Archives {
-		for dIdx, dArc := range dDb.Header.Archives {
-			// if we hit this we have found a compatible archive
-			if sArc.Points == dArc.Points && sArc.SecondsPerPoint == dArc.SecondsPerPoint {
-				sp, se := sDb.DumpArchive(sIdx)
-				if se != nil {
-					return se
-				}
-				dp, de := dDb.DumpArchive(dIdx)
-				if de != nil {
-					return de
-				}
-				// for every point in the src archive
-				for sidx := 0; sidx < len(sp); sidx++ {
-					// check all the points in the dst archive
-					for didx := 0; didx < len(dp); didx++ {
-						// if any dst point has the same timestamp
-						if sp[sidx].Timestamp == dp[didx].Timestamp {
-							// and the values aren't the same
-							if dp[didx].Value != sp[sidx].Value {
-								// update the dst
-								dp[didx].Value = sp[sidx].Value
+	if sDb.Header.Metadata.ArchiveCount != dDb.Header.Metadata.ArchiveCount {
+		return fmt.Errorf("The files have a mismatched set of archives.")
+	} else {
+		// Now we'll start processing the archives, checking as we go to see if they
+		// are matched. That way we at least fill in what we can, possibly....
+		for i, a := range sDb.Header.Archives {
+			// The offset
+			if a.Offset == dDb.Header.Archives[i].Offset {
+				// and the number of points
+				if a.Points == dDb.Header.Archives[i].Points {
+					// and finally the interval
+					if a.SecondsPerPoint == dDb.Header.Archives[i].SecondsPerPoint {
+						// ok, now let's get rolling through the archives
+						sp, se := sDb.DumpArchive(i)
+						if se != nil {
+							return se
+						}
+						dp, de := dDb.DumpArchive(i)
+						if de != nil {
+							return de
+						}
+						for idx := 0; idx < len(sp); idx++ {
+							if sp[idx].Timestamp != 0 && sp[idx].Value != 0 {
+								if dp[idx].Timestamp == 0 || dp[idx].Value == 0 {
+									dp[idx].Timestamp = sp[idx].Timestamp
+									dp[idx].Value = sp[idx].Value
+									dDb.Update(dp[idx])
+								}
 							}
 						}
 					}
@@ -71,7 +85,10 @@ func backFill(src string, dst string) error {
 			}
 		}
 	}
-
+	fillLock.Lock()
+	fillJobs--
+	doneJobs++
+	fillLock.Unlock()
 	// and finally let the caller know nothing went wrong.
 	return nil
 }
@@ -83,15 +100,58 @@ func BackFill(c *cli.Context) {
 		srcArg := c.Args().Get(0)
 		dstArg := c.Args().Get(1)
 		// if we requested more jobs than the default, make sure we update that
-		if c.Int("j") > maxFills {
+		if c.Int("j") != maxFills {
 			maxFills = c.Int("j")
 		}
 		// if both our arguments are files
 		if isFile(srcArg) && isFile(dstArg) {
-			NewInfo(fmt.Sprintf("Backfill: %s -> %s", srcArg, dstArg))
+			// NewInfo(fmt.Sprintf("Backfill: %s -> %s", srcArg, dstArg))
+			StartTime := time.Now().Unix()
 			backFill(srcArg, dstArg)
+			NewInfo(fmt.Sprintf("Filled %d of 1 files: %s", doneJobs, subhuman.HumanTimeColon(time.Now().Unix()-StartTime)))
 		} else if isDir(srcArg) && isDir(dstArg) {
-			return
+			// get our directory lists
+			overlap, totFills := CollateDirs(srcArg, dstArg)
+			Status(fmt.Sprintf("Filled %d of %d files (%3.02f%%): %s",
+				doneJobs,
+				totFills,
+				((float32(doneJobs) / float32(totFills)) * 100.0),
+				subhuman.HumanTimeColon(time.Now().Unix()-StartTime)))
+			StartTime := time.Now().Unix()
+			for k, v := range overlap.Contents {
+				for _, f := range v {
+					// this waits until there are free job slots
+					for fillJobs >= maxFills {
+						now := time.Now().Unix()
+						rate := int64(float64(doneJobs) / (float64(now) - float64(StartTime)))
+						Status(
+							fmt.Sprintf("Filled %d of %d files (%3.02f%%): %s @ %d/sec eta: %s",
+								doneJobs,
+								totFills,
+								((float32(doneJobs) / float32(totFills)) * 100.0),
+								subhuman.HumanTimeColon(now-StartTime),
+								rate,
+								subhuman.HumanTimeColon(int64(totFills-doneJobs)/rate)))
+						time.Sleep(200 * time.Millisecond)
+					}
+					go backFill(fmt.Sprintf("%s/%s/%s",
+						overlap.Source, k, f),
+						fmt.Sprintf("%s/%s/%s",
+							overlap.Destination, k, f))
+					time.Sleep(100 * time.Millisecond)
+				}
+			}
+			// wait for any stray jobs to finish
+			for doneJobs < totFills {
+				time.Sleep(10 * time.Millisecond)
+			}
+			// and print the final status
+			Status(fmt.Sprintf("Filled %d of %d files (%3.02f%%): %s",
+				doneJobs,
+				totFills,
+				((float32(doneJobs) / float32(totFills)) * 100.0),
+				subhuman.HumanTimeColon(time.Now().Unix()-StartTime)))
+			fmt.Println("")
 		} else {
 			fmt.Println("You cannot mix files and directories as src and dst.")
 			os.Exit(1)
@@ -100,85 +160,10 @@ func BackFill(c *cli.Context) {
 	return
 }
 
-/*
-
-func BackFill(c *cli.Context) {
-	if len(c.Args()) < 2 {
-		Error <- "Invalid arguments. See 'flustro help fill' for more information."
-		os.Exit(1)
-	} else {
-		// declare our variables
-		var srcObj Dirstate
-		var dstObj Dirstate
-		srcDir := c.Args().Get(0)
-		dstDir := c.Args().Get(1)
-
-		// Now let's do the heavy lifting
-		if isDir(srcDir) && isDir(dstDir) {
-			// First let's get our dir contents
-			srcObj = ListDir(srcDir)
-			dstObj = ListDir(dstDir)
-			// then spawn our worker pool, and get to processing
-			for i := 0; i < c.Int("j"); i++ {
-				go Filler()
-			}
-			// next we'll start processing through our srcObj and dstObj lists and
-			// backfill everything that's present in both locations
-			overlap := Overlap{
-				Source:      srcObj.Location,
-				Destination: dstObj.Location,
-				Contents:    make(map[string][]string),
-			}
-			overlap_c := 0
-			for k, _ := range srcObj.Contents {
-				if _, ok := dstObj.Contents[k]; ok {
-					for _, v := range srcObj.Contents[k] {
-						for _, dv := range dstObj.Contents[k] {
-							if v == dv {
-								if _, ok := overlap.Contents[k]; ok {
-									overlap.Contents[k] = append(overlap.Contents[k], v)
-									overlap_c++
-								} else {
-									overlap.Contents[k] = []string{v}
-									overlap_c++
-								}
-							}
-						}
-					}
-				}
-			}
-			Info <- fmt.Sprintf("%d entries shared between %s and %s.",
-				overlap_c,
-				overlap.Source,
-				overlap.Destination)
-			for k, v := range overlap.Contents {
-				for _, f := range v {
-					DataChan <- map[string]string{
-						"Source":      fmt.Sprintf("%s/%s/%s", overlap.Source, k, f),
-						"Destination": fmt.Sprintf("%s/%s/%s", overlap.Destination, k, f),
-					}
-				}
-			}
-		} else if isFile(srcDir) && isFile(dstDir) {
-			// we only need one worker for this job
-			go Filler()
-			DataChan <- map[string]string{
-				"Source":      srcDir,
-				"Destination": dstDir,
-			}
-		} else {
-			Error <- fmt.Sprintf("SRC and DST must be either both files or both dirs.")
-		}
-
-		time.Sleep(500 * time.Millisecond)
-	}
-	return
-}
-
-*/
 func init() {
 	fillJobs = 0
-	maxFills = runtime.GOMAXPROCS(0) * 2
+	doneJobs = 0
+	maxFills = runtime.GOMAXPROCS(0) - 2
 	fillLock = &sync.Mutex{}
 	Commands = append(Commands, cli.Command{
 		Name:        "fill",
@@ -190,7 +175,7 @@ func init() {
 			cli.IntFlag{
 				Name:  "j",
 				Usage: "Number of workers (for directory recursion)",
-				Value: runtime.GOMAXPROCS(0) * 2,
+				Value: runtime.GOMAXPROCS(0) - 2,
 			},
 		},
 		SkipFlagParsing: false,

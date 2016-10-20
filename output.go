@@ -16,8 +16,12 @@ var (
 	Prompts   map[string]string
 )
 
+func Status(m string) {
+	fmt.Printf("\r%s %s%s", Prompts["info"], m, padding(int(consInfo().Col)-(len(m)+4)))
+}
+
 func NewInfo(m string) {
-	fmt.Printf("%s %s\n", Prompts["info"], m)
+	fmt.Printf("%s %s%s\n", Prompts["info"], m, padding(int(consInfo().Col)-(len(m)+4)))
 }
 
 func Outputter() {

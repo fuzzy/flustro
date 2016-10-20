@@ -143,6 +143,42 @@ func ListDir(dir string) Dirstate {
 	return retv
 }
 
+func CollateDirs(sDir string, dDir string) (Overlap, int) {
+	Status("Examining the source directory.          ")
+	sObj := ListDir(sDir)
+	Status("Examining the destination directory.          ")
+	dObj := ListDir(dDir)
+	Status("Collating the two directories.          ")
+	overlap := Overlap{
+		Source:      sObj.Location,
+		Destination: dObj.Location,
+		Contents:    make(map[string][]string),
+	}
+	overlap_c := 0
+
+	for k, _ := range sObj.Contents {
+		if _, ok := dObj.Contents[k]; ok {
+			for _, v := range sObj.Contents[k] {
+				for _, dv := range dObj.Contents[k] {
+					if v == dv {
+						if _, ok := overlap.Contents[k]; ok {
+							overlap.Contents[k] = append(overlap.Contents[k], v)
+							overlap_c++
+						} else {
+							overlap.Contents[k] = []string{v}
+							overlap_c++
+						}
+					}
+				}
+			}
+		}
+	}
+
+	Status(fmt.Sprintf("SRC and DST directories share %d files.          ", overlap_c))
+	fmt.Println("")
+	return overlap, overlap_c
+}
+
 func listFiles(p string) (retv []string) {
 	cwd, _ := os.Getwd()
 	os.Chdir(p)

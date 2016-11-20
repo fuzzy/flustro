@@ -148,14 +148,34 @@ func fillArchives(c *cli.Context) {
 					fillLock.Unlock()
 				}()
 				rn_time := (time.Now().Unix() - st_time)
+				done := int(fills - doneJobs)
 				if rn_time == 0 {
 					rn_time = 1
 				}
-				gout.Status("%s %3d%% completed in %s @ %d files/sec",
-					gout.Progress(25, int((float32(doneJobs)/float32(fills))*100.0)),
+				if done == 0 {
+					done = 1
+				}
+				speed := int(int64(doneJobs) / rn_time)
+				remain := (fills - doneJobs)
+				var rm_time int64
+				if remain > 0 && speed > 0 {
+					rm_time = int64(remain / speed)
+				} else {
+					rm_time = 1
+				}
+				cons := gout.ConsInfo()
+				strl := len(fmt.Sprintf("Speed: %d f/sec, Elapsed: %s, Eta: %s %3d%%",
+					speed,
+					gout.HumanTimeColon(rn_time),
+					gout.HumanTimeColon(rm_time),
+					int((float32(doneJobs)/float32(fills))*100.0))) + 7
+				prgl := (cons.Col - uint16(strl))
+				gout.Status("Speed: %d f/sec, Elapsed: %s, Eta: %s, %3d%% %s",
+					speed,
+					gout.HumanTimeColon(rn_time),
+					gout.HumanTimeColon(rm_time),
 					int((float32(doneJobs)/float32(fills))*100.0),
-					gout.HumanTimeConcise(rn_time),
-					int(int64(doneJobs)/rn_time))
+					gout.Progress(int(prgl), int((float32(doneJobs)/float32(fills))*100.0)))
 			}
 		}
 		// wait for all jobs to finish
@@ -163,12 +183,20 @@ func fillArchives(c *cli.Context) {
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
+	cons := gout.ConsInfo()
 	tot_time := time.Now().Unix() - st_time
-	gout.Info("%s %3d%% completed in %s @ %d files/sec",
-		gout.Progress(25, 100),
+	strl := len(fmt.Sprintf("Speed: %d f/sec, Elapsed: %s, Eta: %s, %3d%%",
+		int(int64(doneJobs)/tot_time),
+		gout.HumanTimeColon(tot_time),
+		gout.HumanTimeColon(int64(0)),
+		100)) + 7
+	prgl := (cons.Col - uint16(strl))
+	gout.Info("Speed: %d f/sec, Elapsed: %s, Eta: %s, %3d%% %s",
+		int(int64(doneJobs)/tot_time),
+		gout.HumanTimeColon(tot_time),
+		gout.HumanTimeColon(int64(0)),
 		100,
-		gout.HumanTimeConcise(tot_time),
-		int(int64(doneJobs)/tot_time))
+		gout.Progress(int(prgl), 100))
 }
 
 func init() {

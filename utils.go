@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"git.thwap.org/splat/gout"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -144,11 +145,13 @@ func ListDir(dir string) Dirstate {
 }
 
 func CollateDirs(sDir string, dDir string) (Overlap, int) {
-	Status("Examining the source directory.          ")
+	gout.Status("Examining the source directory.")
 	sObj := ListDir(sDir)
-	Status("Examining the destination directory.          ")
+	gout.Info("Src dir: %s", sDir)
+	gout.Status("Examining the destination directory.")
 	dObj := ListDir(dDir)
-	Status("Collating the two directories.          ")
+	gout.Info("Dst dir: %s", dDir)
+	gout.Status("Collating the two directories.")
 	overlap := Overlap{
 		Source:      sObj.Location,
 		Destination: dObj.Location,
@@ -174,8 +177,7 @@ func CollateDirs(sDir string, dDir string) (Overlap, int) {
 		}
 	}
 
-	Status(fmt.Sprintf("SRC and DST directories share %d files.          ", overlap_c))
-	fmt.Println("")
+	gout.Info("SRC and DST directories share %d files.", overlap_c)
 	return overlap, overlap_c
 }
 

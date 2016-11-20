@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"runtime"
+	"sort"
 	"sync"
 	"time"
 
+	"git.thwap.org/splat/gout"
 	"github.com/kisielk/whisper-go/whisper"
-	"github.com/splatpm/subhuman"
 	"github.com/urfave/cli"
 )
 
@@ -18,6 +18,34 @@ var (
 	maxFills int
 	fillLock *sync.Mutex
 )
+
+// BEGIN: Points sort.Interface implimentation
+
+type Points []whisper.Point
+
+func (p Points) Len() int {
+	return len(p)
+}
+
+func (p Points) Less(i, j int) bool {
+	return p[i].Timestamp < p[j].Timestamp
+}
+
+func (p Points) Swap(i, j int) {
+	p[i], p[j] = p[j], p[i]
+}
+
+func NewPoints(p []whisper.Point) Points {
+	retv := Points{}
+	for i := 0; i < len(p); i++ {
+		if p[i].Value != 0 {
+			retv[i] = p[i]
+		}
+	}
+	return retv
+}
+
+// END: Points sort.Interface implimentation
 
 type Dirstate struct {
 	Location string
@@ -30,137 +58,126 @@ type Overlap struct {
 	Contents    map[string][]string
 }
 
-func backFill(src string, dst string) error {
-	// get the lock on our jobs tracker
-	fillLock.Lock()
-	// increment the tracker
-	fillJobs++
-	// and release the lock
-	fillLock.Unlock()
-
-	// open our file handles
-	sDb, sErr := whisper.Open(src)
-	dDb, dErr := whisper.Open(dst)
-	// check our error status
-	if sErr != nil {
-		return sErr
-	} else if dErr != nil {
-		return dErr
+func fill(src, dst string) error {
+	// open our archives
+	sdb, serr := whisper.Open(src)
+	ddb, derr := whisper.Open(dst)
+	// and error check
+	if serr != nil {
+		return serr
+	} else if derr != nil {
+		return derr
 	}
-	// defer db closes
-	defer sDb.Close()
-	defer dDb.Close()
-	if sDb.Header.Metadata.ArchiveCount != dDb.Header.Metadata.ArchiveCount {
-		return fmt.Errorf("The files have a mismatched set of archives.")
-	} else {
-		// Now we'll start processing the archives, checking as we go to see if they
-		// are matched. That way we at least fill in what we can, possibly....
-		for i, a := range sDb.Header.Archives {
-			// The offset
-			if a.Offset == dDb.Header.Archives[i].Offset {
-				// and the number of points
-				if a.Points == dDb.Header.Archives[i].Points {
-					// and finally the interval
-					if a.SecondsPerPoint == dDb.Header.Archives[i].SecondsPerPoint {
-						// ok, now let's get rolling through the archives
-						sp, se := sDb.DumpArchive(i)
-						if se != nil {
-							return se
-						}
-						dp, de := dDb.DumpArchive(i)
-						if de != nil {
-							return de
-						}
-						for idx := 0; idx < len(sp); idx++ {
-							if sp[idx].Timestamp != 0 && sp[idx].Value != 0 {
-								if dp[idx].Timestamp == 0 || dp[idx].Value == 0 {
-									dp[idx].Timestamp = sp[idx].Timestamp
-									dp[idx].Value = sp[idx].Value
-									dDb.Update(dp[idx])
-								}
-							}
+	// find the oldest point in time
+	stm := time.Now().Unix() - int64(sdb.Header.Metadata.MaxRetention)
+	dtm := time.Now().Unix() - int64(ddb.Header.Metadata.MaxRetention)
+	// and process the archives
+	for _, a := range sdb.Header.Archives {
+		// let's setup the time boundaries
+		from := time.Now().Unix() - int64(a.Retention())
+		// grab the src and dest data and error check
+		_, sp, se := sdb.FetchUntil(uint32(from), uint32(stm))
+		if se != nil {
+			return se
+		}
+		_, dp, de := ddb.FetchUntil(uint32(from), uint32(dtm))
+		if de != nil {
+			return de
+		}
+		// Migrate our []whisper.Point to a Points type for sorting
+		spts := NewPoints(sp)
+		dpts := NewPoints(dp)
+		// and sort that bitch
+		sort.Sort(spts)
+		sort.Sort(dpts)
+		pts := Points{}
+		// now gather an array of points that are non-null and who's corresponding
+		// element in the destination archive is not identical
+		for _, spnt := range spts {
+			for _, dpnt := range dpts {
+				if spnt.Value <= 0 {
+					if spnt.Timestamp == dpnt.Timestamp {
+						if spnt.Value != dpnt.Value {
+							pts = append(pts, spnt)
 						}
 					}
 				}
 			}
 		}
+		ddb.UpdateMany(pts)
 	}
-	fillLock.Lock()
-	fillJobs--
-	doneJobs++
-	fillLock.Unlock()
-	// and finally let the caller know nothing went wrong.
+	// and send the all clear
 	return nil
 }
 
-func BackFill(c *cli.Context) {
+func fillArchives(c *cli.Context) {
 	if len(c.Args()) < 2 {
-		fmt.Println("You fucked up, look at the help output.")
-	} else {
-		srcArg := c.Args().Get(0)
-		dstArg := c.Args().Get(1)
-		// if we requested more jobs than the default, make sure we update that
-		if c.Int("j") != maxFills {
-			maxFills = c.Int("j")
-		}
-		// if both our arguments are files
-		if isFile(srcArg) && isFile(dstArg) {
-			// NewInfo(fmt.Sprintf("Backfill: %s -> %s", srcArg, dstArg))
-			StartTime := time.Now().Unix()
-			backFill(srcArg, dstArg)
-			NewInfo(fmt.Sprintf("Filled %d of 1 files: %s", doneJobs, subhuman.HumanTimeColon(time.Now().Unix()-StartTime)))
-		} else if isDir(srcArg) && isDir(dstArg) {
-			// get our directory lists
-			overlap, totFills := CollateDirs(srcArg, dstArg)
-			Status(fmt.Sprintf("Filled %d of %d files (%3.02f%%): %s",
-				doneJobs,
-				totFills,
-				((float32(doneJobs) / float32(totFills)) * 100.0),
-				subhuman.HumanTimeColon(time.Now().Unix()-StartTime)))
-			StartTime := time.Now().Unix()
-			for k, v := range overlap.Contents {
-				for _, f := range v {
-					// this waits until there are free job slots
-					for fillJobs >= maxFills {
-						now := time.Now().Unix()
-						rate := int64(float64(doneJobs) / (float64(now) - float64(StartTime)))
-						Status(
-							fmt.Sprintf("Filled %d of %d files (%3.02f%%): %s @ %d/sec eta: %s",
-								doneJobs,
-								totFills,
-								((float32(doneJobs) / float32(totFills)) * 100.0),
-								subhuman.HumanTimeColon(now-StartTime),
-								rate,
-								subhuman.HumanTimeColon(int64(totFills-doneJobs)/rate)))
-						time.Sleep(200 * time.Millisecond)
-					}
-					go backFill(fmt.Sprintf("%s/%s/%s",
-						overlap.Source, k, f),
-						fmt.Sprintf("%s/%s/%s",
-							overlap.Destination, k, f))
+		gout.Error("Invalid arguments")
+	}
+	src := c.Args().Get(0)
+	dst := c.Args().Get(1)
+	if c.Int("j") != maxFills {
+		maxFills = c.Int("j")
+	}
+	st_time := time.Now().Unix()
+	if isFile(src) && isFile(dst) {
+		fill(src, dst)
+		gout.Info("This file took %s", gout.HumanTimeConcise(time.Now().Unix()-st_time))
+	} else if isDir(src) && isDir(dst) {
+		ovr, fills := CollateDirs(src, dst)
+		for k, v := range ovr.Contents {
+			for _, f := range v {
+				// hold off if we need to
+				for fillJobs >= maxFills {
 					time.Sleep(100 * time.Millisecond)
 				}
+				go func() {
+					fillLock.Lock()
+					fillJobs++
+					fillLock.Unlock()
+					s := fmt.Sprintf("%s/%s/%s", ovr.Source, k, f)
+					d := fmt.Sprintf("%s/%s/%s", ovr.Destination, k, f)
+					fill(s, d)
+					fillLock.Lock()
+					fillJobs--
+					doneJobs++
+					fillLock.Unlock()
+				}()
+				rn_time := (time.Now().Unix() - st_time)
+				if rn_time == 0 {
+					rn_time = 1
+				}
+				gout.Status("%d of %d completed in %s @ %d/sec",
+					doneJobs,
+					fills,
+					gout.HumanTimeConcise(rn_time),
+					int(int64(doneJobs)/rn_time))
 			}
-			// wait for any stray jobs to finish
-			for doneJobs < totFills {
-				time.Sleep(10 * time.Millisecond)
-			}
-			// and print the final status
-			Status(fmt.Sprintf("Filled %d of %d files (%3.02f%%): %s",
-				doneJobs,
-				totFills,
-				((float32(doneJobs) / float32(totFills)) * 100.0),
-				subhuman.HumanTimeColon(time.Now().Unix()-StartTime)))
-			fmt.Println("")
-		} else {
-			fmt.Println("You cannot mix files and directories as src and dst.")
-			os.Exit(1)
+		}
+		// wait for all jobs to finish
+		for doneJobs < fills {
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
-	return
+	tot_time := time.Now().Unix() - st_time
+	gout.Info("%d of %d completed in %s @ %d/sec",
+		doneJobs,
+		doneJobs,
+		gout.HumanTimeConcise(tot_time),
+		int(int64(doneJobs)/tot_time))
 }
 
 func init() {
+	gout.Setup(true, false, true, "")
+	gout.Output.Prompts["status"] = fmt.Sprintf("%s%s%s",
+		gout.String(".").Cyan(),
+		gout.String(".").Bold().Cyan(),
+		gout.String(".").Bold().White())
+	gout.Output.Prompts["info"] = gout.Output.Prompts["status"]
+	gout.Output.Prompts["debug"] = fmt.Sprintf("%s.%s.%s",
+		gout.String(".").Purple(),
+		gout.String(".").Bold().Purple(),
+		gout.String(".").Bold().White())
 	fillJobs = 0
 	doneJobs = 0
 	maxFills = runtime.GOMAXPROCS(0) - 2
@@ -181,6 +198,6 @@ func init() {
 		SkipFlagParsing: false,
 		HideHelp:        false,
 		Hidden:          false,
-		Action:          BackFill,
+		Action:          fillArchives,
 	})
 }

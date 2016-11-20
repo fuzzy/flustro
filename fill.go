@@ -68,6 +68,8 @@ func fill(src, dst string) error {
 	} else if derr != nil {
 		return derr
 	}
+	defer sdb.Close()
+	defer ddb.Close()
 	// find the oldest point in time
 	stm := time.Now().Unix() - int64(sdb.Header.Metadata.MaxRetention)
 	dtm := time.Now().Unix() - int64(ddb.Header.Metadata.MaxRetention)
@@ -122,9 +124,11 @@ func fillArchives(c *cli.Context) {
 	st_time := time.Now().Unix()
 	if isFile(src) && isFile(dst) {
 		fill(src, dst)
+		st_time = time.Now().Unix()
 		gout.Info("This file took %s", gout.HumanTimeConcise(time.Now().Unix()-st_time))
 	} else if isDir(src) && isDir(dst) {
 		ovr, fills := CollateDirs(src, dst)
+		st_time = time.Now().Unix()
 		for k, v := range ovr.Contents {
 			for _, f := range v {
 				// hold off if we need to

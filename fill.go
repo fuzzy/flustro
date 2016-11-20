@@ -151,9 +151,9 @@ func fillArchives(c *cli.Context) {
 				if rn_time == 0 {
 					rn_time = 1
 				}
-				gout.Status("%d of %d completed in %s @ %d/sec",
-					doneJobs,
-					fills,
+				gout.Status("%s %3d%% completed in %s @ %d files/sec",
+					gout.Progress(25, int((float32(doneJobs)/float32(fills))*100.0)),
+					int((float32(doneJobs)/float32(fills))*100.0),
 					gout.HumanTimeConcise(rn_time),
 					int(int64(doneJobs)/rn_time))
 			}
@@ -164,9 +164,9 @@ func fillArchives(c *cli.Context) {
 		}
 	}
 	tot_time := time.Now().Unix() - st_time
-	gout.Info("%d of %d completed in %s @ %d/sec",
-		doneJobs,
-		doneJobs,
+	gout.Info("%s %3d%% completed in %s @ %d files/sec",
+		gout.Progress(25, 100),
+		100,
 		gout.HumanTimeConcise(tot_time),
 		int(int64(doneJobs)/tot_time))
 }

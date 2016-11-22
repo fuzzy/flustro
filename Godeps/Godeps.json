@@ -1,0 +1,25 @@
+{
+	"ImportPath": "git.thwap.org/fuzzy/flustro",
+	"GoVersion": "go1.7",
+	"GodepVersion": "v75",
+	"Deps": [
+		{
+			"ImportPath": "git.thwap.org/splat/gout",
+			"Rev": "2c38d3de72c76668845c4975b9cf2890a7474469"
+		},
+		{
+			"ImportPath": "github.com/Knetic/govaluate",
+			"Comment": "2.2.0",
+			"Rev": "93f778d2172335e459bd2fb6d8db5429ecedccdf"
+		},
+		{
+			"ImportPath": "github.com/kisielk/whisper-go/whisper",
+			"Rev": "82e8091afdea241119c34a452fe24fcc2a0b962e"
+		},
+		{
+			"ImportPath": "github.com/urfave/cli",
+			"Comment": "v1.18.0-67-gd53eb99",
+			"Rev": "d53eb991652b1d438abdd34ce4bfa3ef1539108e"
+		}
+	]
+}

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"time"
 
+	"git.thwap.org/splat/gout"
 	"github.com/urfave/cli"
 )
 
@@ -19,8 +21,31 @@ var (
 
 // Starting things rolling down the hill
 func main() {
-	// start our outputter thread
-	go Outputter()
+	// Setup our output
+	gout.Setup(false, false, true, "")
+	gout.Output.Throbber = []string{
+		string(gout.String(".").Cyan()),
+		string(gout.String("o").Bold().Cyan()),
+		string(gout.String("O").Bold().White()),
+		string(gout.String("o").Bold().Cyan()),
+	}
+	gout.Output.Prompts["info"] = fmt.Sprintf("%s%s%s",
+		gout.String(".").Cyan(),
+		gout.String(".").Bold().Cyan(),
+		gout.String(".").Bold().White())
+	gout.Output.Prompts["warn"] = fmt.Sprintf("%s%s%s",
+		gout.String(".").Yellow(),
+		gout.String(".").Bold().Yellow(),
+		gout.String(".").Bold().White())
+	gout.Output.Prompts["error"] = fmt.Sprintf("%s%s%s",
+		gout.String(".").Red(),
+		gout.String(".").Bold().Red(),
+		gout.String(".").Bold().White())
+	gout.Output.Prompts["debug"] = fmt.Sprintf("%s%s%s",
+		gout.String(".").Purple(),
+		gout.String(".").Bold().Purple(),
+		gout.String(".").Bold().White())
+	gout.Output.Prompts["status"] = gout.Output.Prompts["info"]
 
 	// Define our app container
 	app := cli.NewApp()

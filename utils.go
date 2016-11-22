@@ -63,7 +63,7 @@ func isFile(p string) bool {
 
 func chkErr(e error) bool {
 	if e != nil {
-		Error <- fmt.Sprintln(e.Error())
+		gout.Error(e.Error())
 		return false
 	} else {
 		return true
@@ -123,7 +123,7 @@ func ListDir(dir string) Dirstate {
 	os.Chdir(dir)
 	filepath.Walk(".", func(p string, i os.FileInfo, e error) error {
 		if e != nil {
-			Error <- e.Error()
+			gout.Error(e.Error())
 		} else {
 			if !i.IsDir() {
 				// let's seperate the components
@@ -184,7 +184,7 @@ func CollateDirs(sDir string, dDir string) (Overlap, int) {
 func listFiles(p string) (retv []string) {
 	cwd, _ := os.Getwd()
 	os.Chdir(p)
-	Info <- fmt.Sprintf("Examinging directory: %s", p)
+	gout.Info("Examinging directory: %s", p)
 	filepath.Walk(".", func(p string, i os.FileInfo, e error) error {
 		chkErr(e)
 		if !i.IsDir() {

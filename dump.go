@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"time"
 
+	"git.thwap.org/splat/gout"
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/urfave/cli"
 )
@@ -56,7 +57,7 @@ func dumpStruct(s interface{}, h bool) {
 					}
 				}
 			}
-			Info <- output
+			gout.Info(output)
 		}
 		// Now let's dump our contents
 		output := ""
@@ -70,7 +71,7 @@ func dumpStruct(s interface{}, h bool) {
 						output = Strappend(output, fmt.Sprintf("%s%s| ", value, buffer((le[0]+1), len(value))))
 					} else {
 						output = Strappend(output, fmt.Sprintf("%s%s", value, buffer((le[0]+1), len(value))))
-						Info <- output
+						gout.Info(output)
 						output = ""
 					}
 				}
@@ -85,7 +86,7 @@ func DumpWhisperFile(c *cli.Context) error {
 		data := Metadata{}
 		db, err := whisper.Open(f)
 		if err != nil {
-			Error <- fmt.Sprintln(err)
+			gout.Error(err.Error())
 			return err
 		} else {
 			defer db.Close()
@@ -107,7 +108,7 @@ func DumpWhisperFile(c *cli.Context) error {
 				})
 				p, e := db.DumpArchive(i)
 				if e != nil {
-					Error <- fmt.Sprintln(e.Error())
+					gout.Error(e.Error())
 					return e
 				}
 				for _, point := range p {

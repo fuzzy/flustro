@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"sort"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -144,13 +145,25 @@ func ListDir(dir string) Dirstate {
 	return retv
 }
 
+func countElements(d map[string][]string) int32 {
+	var retv int32 = 0
+	for _, v := range d {
+		for _, _ = range v {
+			retv++
+		}
+	}
+	return retv
+}
+
 func CollateDirs(sDir string, dDir string) (Overlap, int) {
 	gout.Status("Examining the source directory.")
+	st := time.Now().Unix()
 	sObj := ListDir(sDir)
-	gout.Info("Src dir: %s", sDir)
+	gout.Info("Src dir: %s %s (%d files)", sDir, gout.HumanTimeColon(time.Now().Unix()-st), countElements(sObj.Contents))
 	gout.Status("Examining the destination directory.")
+	st = time.Now().Unix()
 	dObj := ListDir(dDir)
-	gout.Info("Dst dir: %s", dDir)
+	gout.Info("Dst dir: %s %s (%d files)", dDir, gout.HumanTimeColon(time.Now().Unix()-st), countElements(dObj.Contents))
 	gout.Status("Collating the two directories.")
 	overlap := Overlap{
 		Source:      sObj.Location,
@@ -177,7 +190,7 @@ func CollateDirs(sDir string, dDir string) (Overlap, int) {
 		}
 	}
 
-	gout.Info("SRC and DST directories share %d files.", overlap_c)
+	gout.Info("Overlap: %d files.", overlap_c)
 	return overlap, overlap_c
 }
 

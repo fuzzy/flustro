@@ -92,7 +92,7 @@ func fill(src, dst string) error {
 		// and sort that bitch
 		sort.Sort(spts)
 		sort.Sort(dpts)
-		pts := Points{}
+		pts := []whisper.Point{}
 		// now gather an array of points that are non-null and who's corresponding
 		// element in the destination archive is not identical
 		for _, spnt := range spts {

@@ -52,6 +52,16 @@ type Dirstate struct {
 	Contents map[string][]string
 }
 
+func (d Dirstate) Count() int {
+	retv := 0
+	for _, a := range d.Contents {
+		for _, _ = range a {
+			retv++
+		}
+	}
+	return retv
+}
+
 type Overlap struct {
 	Source      string
 	Destination string

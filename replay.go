@@ -17,8 +17,13 @@ import (
 
 var mutex = &sync.Mutex{}
 var running = 0
+var complete = 0
+var total = 0
 
 func replayThisFile(fpath string, mname string, sock net.Conn) {
+	for running >= (8 * runtime.GOMAXPROCS(0)) {
+		time.Sleep(1 * time.Second)
+	}
 	mutex.Lock()
 	running++
 	mutex.Unlock()
@@ -39,45 +44,66 @@ func replayThisFile(fpath string, mname string, sock net.Conn) {
 			}
 		}
 		db.Close()
+		sock.Close()
 	}
 	mutex.Lock()
 	running--
+	complete++
 	mutex.Unlock()
 }
 
 func Replay(c *cli.Context) error {
-	sock, se := net.Dial("tcp", fmt.Sprintf("%s:%d", c.String("H"), c.Int("P")))
-	if se != nil {
-		gout.Error(se.Error())
-		panic(se.Error())
-	}
+	start := time.Now().Unix()
 	for _, arg := range c.Args() {
 		fpath := fmt.Sprintf("%s/%s", c.String("R"), arg)
 		if isFile(fpath) {
 			mname := fmt.Sprintf("%s.%s", strings.Replace(path.Dir(arg), "/", ".", -1), strings.Replace(path.Base(arg), ".wsp", "", -1))
+			sock, se := net.Dial("tcp", fmt.Sprintf("%s:%d", c.String("H"), c.Int("P")))
+			if se != nil {
+				gout.Error(se.Error())
+				panic(se.Error())
+			}
 			replayThisFile(fpath, mname, sock)
 		} else if isDir(fpath) {
 			data := ListDir(fpath)
-			datac := data.Count()
-			datai := 0
+			total = data.Count()
 			for dirn, dirc := range data.Contents {
 				for _, fn := range dirc {
 					fpath := fmt.Sprintf("%s/%s/%s/%s", c.String("R"), arg, dirn, fn)
 					if isFile(fpath) {
-						mname := fmt.Sprintf("%s.%s", strings.Replace(arg, "/", ".", -1), strings.Replace(path.Base(fpath), ".wsp", "", -1))
-						for running >= runtime.GOMAXPROCS(0) {
-							time.Sleep(250 * time.Millisecond)
+						mname := fmt.Sprintf("%s.%s.%s",
+							strings.Replace(arg, "/", ".", -1),
+							strings.Replace(dirn, "/", ".", -1),
+							strings.Replace(path.Base(fpath), ".wsp", "", -1))
+						sock, se := net.Dial("tcp", fmt.Sprintf("%s:%d", c.String("H"), c.Int("P")))
+						if se != nil {
+							gout.Error(se.Error())
+							panic(se.Error())
 						}
-						gout.Status("%d of %d: %s", datai, datac, mname)
-						replayThisFile(fpath, mname, sock)
-						datai++
+						go replayThisFile(fpath, mname, sock)
+						cols := int(consInfo().Col)
+						prgr := int((float64(complete) / float64(total)) * 100.0)
+						elps := time.Now().Unix() - start
+						line := fmt.Sprintf("%4d of %4d @ %d/sec (%3d%%) :", complete, total, (complete / int(elps)), prgr)
+						gout.Status("%s %s", line, gout.Progress(((cols-len(line))-7), int((float64(complete)/float64(total))*100.0)))
 					}
 				}
 			}
+			for complete < total {
+				time.Sleep(100 * time.Millisecond)
+				cols := int(consInfo().Col)
+				prgr := int((float64(complete) / float64(total)) * 100.0)
+				elps := time.Now().Unix() - start
+				line := fmt.Sprintf("%4d of %4d @ %d/sec (%3d%%) :", complete, total, (complete / int(elps)), prgr)
+				gout.Status("%s %s", line, gout.Progress(((cols-len(line))-7), int((float64(complete)/float64(total))*100.0)))
+			}
 		}
 	}
-	sock.Close()
-	fmt.Println("")
+	cols := int(consInfo().Col)
+	prgr := int((float64(complete) / float64(total)) * 100.0)
+	elps := time.Now().Unix() - start
+	line := fmt.Sprintf("%4d of %4d @ %d/sec (%3d%%) :", complete, total, (complete / int(elps)), prgr)
+	gout.Info("%s %s", line, gout.Progress(((cols-len(line))-7), int((float64(complete)/float64(total))*100.0)))
 	return nil
 }
 

@@ -127,7 +127,7 @@ func ListDir(dir string) Dirstate {
 			gout.Error(e.Error())
 		} else {
 			if !i.IsDir() {
-				// let's seperate the components
+				// let's separate the components
 				b := filepath.Dir(p)
 				f := filepath.Base(p)
 				// and analyze them
@@ -148,7 +148,7 @@ func ListDir(dir string) Dirstate {
 func countElements(d map[string][]string) int32 {
 	var retv int32 = 0
 	for _, v := range d {
-		for _, _ = range v {
+		for range v {
 			retv++
 		}
 	}
@@ -172,7 +172,7 @@ func CollateDirs(sDir string, dDir string) (Overlap, int) {
 	}
 	overlap_c := 0
 
-	for k, _ := range sObj.Contents {
+	for k := range sObj.Contents {
 		if _, ok := dObj.Contents[k]; ok {
 			for _, v := range sObj.Contents[k] {
 				for _, dv := range dObj.Contents[k] {

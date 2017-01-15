@@ -19,7 +19,7 @@ var (
 	fillLock *sync.Mutex
 )
 
-// BEGIN: Points sort.Interface implimentation
+// BEGIN: Points sort.Interface implementation
 
 type Points []whisper.Point
 
@@ -45,7 +45,7 @@ func NewPoints(p []whisper.Point) Points {
 	return retv
 }
 
-// END: Points sort.Interface implimentation
+// END: Points sort.Interface implementation
 
 type Dirstate struct {
 	Location string
@@ -55,7 +55,7 @@ type Dirstate struct {
 func (d Dirstate) Count() int {
 	retv := 0
 	for _, a := range d.Contents {
-		for _, _ = range a {
+		for range a {
 			retv++
 		}
 	}
@@ -161,9 +161,6 @@ func fillArchives(c *cli.Context) {
 				done := int(fills - doneJobs)
 				if rn_time == 0 {
 					rn_time = 1
-				}
-				if done == 0 {
-					done = 1
 				}
 				speed := int(int64(doneJobs) / rn_time)
 				remain := (fills - doneJobs)

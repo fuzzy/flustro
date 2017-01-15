@@ -158,7 +158,6 @@ func fillArchives(c *cli.Context) {
 					fillLock.Unlock()
 				}()
 				rn_time := (time.Now().Unix() - st_time)
-				done := int(fills - doneJobs)
 				if rn_time == 0 {
 					rn_time = 1
 				}

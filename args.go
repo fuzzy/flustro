@@ -56,7 +56,7 @@ func main() {
 	app.Version = "0.1.0"
 	app.Compiled = time.Now()
 	app.Authors = []cli.Author{
-		cli.Author{
+		{
 			Name:  "Mike 'Fuzzy' Partin",
 			Email: "fuzzy@fumanchu.org",
 		},

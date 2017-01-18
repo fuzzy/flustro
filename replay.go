@@ -57,7 +57,9 @@ func Replay(c *cli.Context) error {
 	for _, arg := range c.Args() {
 		fpath := fmt.Sprintf("%s/%s", c.String("R"), arg)
 		if isFile(fpath) {
-			mname := fmt.Sprintf("%s.%s", strings.Replace(path.Dir(arg), "/", ".", -1), strings.Replace(path.Base(arg), ".wsp", "", -1))
+			mname := fmt.Sprintf("%s.%s",
+				strings.Replace(path.Dir(arg), "/", ".", -1),
+				strings.Replace(path.Base(arg), ".wsp", "", -1))
 			sock, se := net.Dial("tcp", fmt.Sprintf("%s:%d", c.String("H"), c.Int("P")))
 			if se != nil {
 				gout.Error(se.Error())
@@ -84,8 +86,14 @@ func Replay(c *cli.Context) error {
 						cols := int(consInfo().Col)
 						prgr := int((float64(complete) / float64(total)) * 100.0)
 						elps := time.Now().Unix() - start
-						line := fmt.Sprintf("%4d of %4d @ %d/sec (%3d%%) :", complete, total, (complete / int(elps)), prgr)
-						gout.Status("%s %s", line, gout.Progress(((cols-len(line))-7), int((float64(complete)/float64(total))*100.0)))
+						line := fmt.Sprintf("%4d of %4d @ %d/sec (%3d%%) :",
+							complete,
+							total,
+							(complete / int(elps)), prgr)
+						gout.Status("%s %s",
+							line,
+							gout.Progress(((cols-len(line))-7),
+								int((float64(complete)/float64(total))*100.0)))
 					}
 				}
 			}
@@ -94,16 +102,28 @@ func Replay(c *cli.Context) error {
 				cols := int(consInfo().Col)
 				prgr := int((float64(complete) / float64(total)) * 100.0)
 				elps := time.Now().Unix() - start
-				line := fmt.Sprintf("%4d of %4d @ %d/sec (%3d%%) :", complete, total, (complete / int(elps)), prgr)
-				gout.Status("%s %s", line, gout.Progress(((cols-len(line))-7), int((float64(complete)/float64(total))*100.0)))
+				line := fmt.Sprintf("%4d of %4d @ %d/sec (%3d%%) :",
+					complete,
+					total,
+					(complete / int(elps)), prgr)
+				gout.Status("%s %s",
+					line,
+					gout.Progress(((cols-len(line))-7),
+						int((float64(complete)/float64(total))*100.0)))
 			}
 		}
 	}
 	cols := int(consInfo().Col)
 	prgr := int((float64(complete) / float64(total)) * 100.0)
 	elps := time.Now().Unix() - start
-	line := fmt.Sprintf("%4d of %4d @ %d/sec (%3d%%) :", complete, total, (complete / int(elps)), prgr)
-	gout.Info("%s %s", line, gout.Progress(((cols-len(line))-7), int((float64(complete)/float64(total))*100.0)))
+	line := fmt.Sprintf("%4d of %4d @ %d/sec (%3d%%) :",
+		complete,
+		total,
+		(complete / int(elps)), prgr)
+	gout.Info("%s %s",
+		line,
+		gout.Progress(((cols-len(line))-7),
+			int((float64(complete)/float64(total))*100.0)))
 	return nil
 }
 

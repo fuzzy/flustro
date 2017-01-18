@@ -1,5 +1,6 @@
 
 # flustro
+
 Flustro (whisper in esperanto) is a toolkit for dealing with whisper files.
 
 ---
@@ -9,6 +10,7 @@ Flustro (whisper in esperanto) is a toolkit for dealing with whisper files.
 ---
 
 ## Installation
+
 ```
 $ go get -u github.com/fuzzy/flustro
 ```
@@ -16,6 +18,7 @@ $ go get -u github.com/fuzzy/flustro
 ## Usage Examples
 
 #### flustro dump
+
 ```
 $ flustro dump whisper/collectd/hostname/cpu-0/user.wsp
 >> File           | AggMethod      | MaxRetention   | NumArchives                                                  

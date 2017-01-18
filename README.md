@@ -1,7 +1,7 @@
-[![Build Status](https://travis-ci.org/fuzzy/flustro.svg)](https://travis-ci.org/fuzzy/flustro)
-[![Codebeat](https://codebeat.co/badges/06369d13-abb0-4e16-946b-f13c242bd88c)](https://codebeat.co/a/fuzzy-wombat-iii/projects/flustro-master)
 # flustro
 Flustro (whisper in esperanto) is a toolkit for dealing with whisper files.
+---
+[![Build Status](https://travis-ci.org/fuzzy/flustro.svg)](https://travis-ci.org/fuzzy/flustro) [![Codebeat](https://codebeat.co/badges/06369d13-abb0-4e16-946b-f13c242bd88c)](https://codebeat.co/a/fuzzy-wombat-iii/projects/flustro-master)
 
 ## Installation
 ```
